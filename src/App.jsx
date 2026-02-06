@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { FinanceProvider } from './context/FinanceContext';
 import HomeMenu from './components/dashboard/HomeMenu';
 import ShiftDashboard from './components/dashboard/ShiftDashboard';
-import HistoryModal from './components/dashboard/HistoryModal'; // Importing directly to re-use if needed or just use ShiftDashboard's modal
+import HistoryModal from './components/dashboard/HistoryModal';
+import MetricsComparison from './components/dashboard/MetricsComparison';
 
 // Simple Error Boundary
 class ErrorBoundary extends React.Component {
@@ -52,22 +53,20 @@ function AppContent() {
 
       {/* For now, map 'history' and 'stats' back to dashboard or placeholders until dedicated pages exist */}
       {currentView === 'history' && (
-        // Re-using ShiftDashboard but maybe we want to open the modal immediately?
-        // For simplicity, let's just go to dashboard and open history manually or maybe pass a prop?
-        // Let's keep it simple: Go to Dashboard for now as it contains the history.
-        // OR better: Create a wrapper or pass a prop to ShiftDashboard to auto-open history.
-        // But the user asked for "pages". Let's use the ShiftDashboard as the main "Work" view.
-        // But for "History" specifically, maybe we can just show the HistoryModal over the Home?
-        // Let's implement a simple placeholder for now or redirect to dashboard.
-        // Let's try to render ShiftDashboard and maybe we can control it?
-        // Actually, let's just make 'history' open the dashboard with history modal open?
-        // For this iteration, let's just map everything to Dashboard if it's not implemented yet, or show a "Coming Soon" for settings.
-
-        <ShiftDashboard onBack={() => setCurrentView('home')} />
+        <HistoryModal onClose={() => setCurrentView('home')} />
       )}
 
       {currentView === 'stats' && (
-        <ShiftDashboard onBack={() => setCurrentView('home')} />
+        <div className="container" style={{ paddingTop: '20px' }}>
+          <button
+            onClick={() => setCurrentView('home')}
+            className="btn btn-secondary"
+            style={{ marginBottom: '20px', alignSelf: 'flex-start' }}
+          >
+            ← Volver
+          </button>
+          <MetricsComparison />
+        </div>
       )}
 
       {currentView === 'settings' && (
