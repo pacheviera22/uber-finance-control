@@ -1,290 +1,264 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { TrendingUp, TrendingDown, BarChart2, MapPin, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart2, Calendar, DollarSign, Activity, Settings } from 'lucide-react';
 
 export default function MetricsComparison() {
     const { allTrips, metrics, session, t, config, actions: { updateConfig } } = useFinance();
-    const [period, setPeriod] = useState('yesterday'); // 'yesterday' | 'weekly'
+
+    // State for Config/Filters
+    const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'weekly'
+    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    const [selectedMetric, setSelectedMetric] = useState('earnings'); // 'earnings' | 'net' | 'miles' | 'expenses'
+
     const [isEditingGas, setIsEditingGas] = useState(false);
     const [tempGasPrice, setTempGasPrice] = useState(config.gasPrice);
 
-    // Calculate historical stats
-    const stats = useMemo(() => {
-        const calculateStats = (tripList) => {
-            const earnings = tripList.reduce((sum, t) => sum + t.amount, 0);
+    // --- Helpers ---
+    const getStartEndTimestamps = (mode, dateStr) => {
+        const date = new Date(dateStr + 'T00:00:00'); // Local midnight
 
-            // Refactored: Calculate miles from max/min odometer in the period
-            let miles = 0;
-            if (tripList.length > 1) {
-                // Sort by odometer to be safe
-                const sorted = [...tripList].sort((a, b) => a.odometer - b.odometer);
-                const minOdo = sorted[0].odometer;
-                const maxOdo = sorted[sorted.length - 1].odometer;
-                miles = maxOdo - minOdo;
-            } else if (tripList.length === 1) {
-                // Estimated avg per trip if only 1 data point (fallback)
-                miles = 5;
-            }
-
-            const costs = (
-                (miles / config.vehicleMpg * config.gasPrice) +
-                (miles * config.maintenanceCostPerMile)
-            );
-
-            return { earnings, costs, net: earnings - costs };
-        };
-
-        const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
-        // Yesterday
-        const yesterdayStart = new Date(todayStart - 86400000).getTime();
-        const yesterdayEnd = todayStart;
-
-        // Last 7 Days
-        const lastWeekStart = new Date(todayStart - (7 * 86400000)).getTime();
-
-        const tripsYesterday = allTrips.filter(t => t.timestamp >= yesterdayStart && t.timestamp < yesterdayEnd);
-        const statsYesterday = calculateStats(tripsYesterday);
-
-        const tripsLastWeek = allTrips.filter(t => t.timestamp >= lastWeekStart && t.timestamp < todayStart);
-        const statsLastWeek = calculateStats(tripsLastWeek);
-
-        // Daily Avg
-        const dayMap = {};
-        const costMap = {};
-        const netMap = {};
-
-        tripsLastWeek.forEach(t => {
-            const dayKey = new Date(t.timestamp).toDateString();
-            if (!dayMap[dayKey]) { dayMap[dayKey] = 0; costMap[dayKey] = 0; netMap[dayKey] = 0; }
-
-            // Re-calc cost per trip here to be safe
-            const dist = t.distance || 0;
-            const mpg = t.mpg || config.vehicleMpg;
-            const price = t.gasPrice || config.gasPrice;
-            const cost = ((dist / mpg) * price) + (dist * config.maintenanceCostPerMile);
-
-            dayMap[dayKey] += t.amount;
-            costMap[dayKey] += cost;
-            netMap[dayKey] += (t.amount - cost);
-        });
-
-        const activeDays = Object.keys(dayMap).length;
-
-        const avgEarnings = activeDays > 0 ? (statsLastWeek.earnings / activeDays) : 0;
-        const avgCosts = activeDays > 0 ? (statsLastWeek.costs / activeDays) : 0;
-        const avgNet = activeDays > 0 ? (statsLastWeek.net / activeDays) : 0;
-
-        return {
-            yesterday: statsYesterday,
-            weeklyAvg: {
-                earnings: avgEarnings,
-                costs: avgCosts,
-                net: avgNet
-            },
-            _yesterdayStart: yesterdayStart
-        };
-    }, [allTrips, config]);
-
-    // Hourly Chart Data (Current Shift)
-    const chartData = useMemo(() => {
-        if (!session.startTime) return [];
-
-        const hours = {};
-        const getHourLabel = (ts) => {
-            const date = new Date(ts);
-            return date.getHours(); // 0-23
-        };
-
-        // Initialize session hours
-        const startHour = new Date(session.startTime).getHours();
-        const currentHour = new Date().getHours();
-
-        // Handle day crossing logic simply: just iterate from start to current
-        // If current < start, add 24 to current for loop, then modulo 24 for label
-        let endIter = currentHour < startHour ? currentHour + 24 : currentHour;
-
-        for (let i = startHour; i <= endIter; i++) {
-            hours[i % 24] = 0;
+        let start, end;
+        if (mode === 'daily') {
+            start = date.getTime();
+            end = start + 86400000; // +24h
+        } else {
+            // Weekly: Start from Monday of the selected week
+            const day = date.getDay(); // 0 (Sun) - 6 (Sat)
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+            const monday = new Date(date.setDate(diff));
+            monday.setHours(0, 0, 0, 0);
+            start = monday.getTime();
+            end = start + (7 * 86400000);
         }
-
-        // Fill with trip data
-        // Filter trips belonging to current session
-        const sessionTrips = allTrips.filter(t => t.timestamp >= session.startTime);
-
-        sessionTrips.forEach(t => {
-            const h = new Date(t.timestamp).getHours();
-            if (hours[h] !== undefined) {
-                hours[h] += t.amount;
-            }
-        });
-
-        return Object.entries(hours).map(([hour, amount]) => ({
-            hour: `${hour}:00`,
-            amount
-        }));
-    }, [allTrips, session.startTime]);
-
-    const comparisonObj = period === 'yesterday' ? stats.yesterday : stats.weeklyAvg;
-    const currentNet = metrics.totalNetProfit;
-    const diff = currentNet - comparisonObj.net;
-    const isPositive = diff >= 0;
-
-    // Derived Current Stats
-    const earningsPerMile = metrics.milesDriven > 0 ? (metrics.totalEarnings / metrics.milesDriven) : 0;
-    const durationHours = session.startTime ? ((Date.now() - session.startTime - session.totalPausedTime) / 3600000) : 0;
-    const earningsPerHour = durationHours > 0 ? (metrics.totalEarnings / durationHours) : 0;
-
-    // Derived Historical Stats (Approximate)
-
-
-    // Helper to render comparison text
-    const renderComp = (current, historical) => {
-        const diff = current - historical;
-        const isPos = diff >= 0;
-        return (
-            <span style={{ fontSize: '12px', color: isPos ? 'var(--accent-color)' : 'var(--error-color)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                {isPos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                {/* Only show percent if meaningful, else show abs diff */}
-                {Math.abs(diff).toFixed(2)}
-            </span>
-        );
+        return { start, end };
     };
 
+    // --- Data Processing ---
+    const filteredData = useMemo(() => {
+        const { start, end } = getStartEndTimestamps(viewMode, selectedDate);
+
+        // Filter trips in range
+        const timeframeTrips = allTrips.filter(t => t.timestamp >= start && t.timestamp < end);
+
+        // Aggregate Defaults
+        let totalEarnings = 0;
+        let totalMiles = 0;
+        let totalExpenses = 0;
+
+        // Chart Data Struct
+        const chartMap = {};
+
+        // Initialize Chart Labels
+        if (viewMode === 'daily') {
+            for (let i = 0; i < 24; i++) chartMap[i] = 0;
+        } else {
+            // Weekly: 0 (Sun) to 6 (Sat) or 0 (Mon) to 6 (Sun). Let's use Date Index 0-6.
+            // Simplified: Map Date String to Value
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(start + i * 86400000);
+                const k = d.toLocaleDateString(undefined, { weekday: 'short' });
+                chartMap[k] = 0;
+            }
+        }
+
+        // Process Trips
+        timeframeTrips.forEach(trip => {
+            // Calc Financials
+            const earnings = trip.amount || 0;
+            const dist = trip.distance || 0; // Assuming we have trip distance logic or using odometer diff if sequential
+            // Fallback for distance if per-trip distance not stored explicitly, use estimated avg or 0
+            // Note: Odometer calc is tricky per-trip if not strictly sequential. 
+            // Using placeholder logic: avg 5 miles per trip or user input if available.
+            const miles = dist > 0 ? dist : 5; // Fallback
+
+            const cost = (miles / config.vehicleMpg * config.gasPrice) + (miles * config.maintenanceCostPerMile);
+            const net = earnings - cost;
+
+            totalEarnings += earnings;
+            totalMiles += miles;
+            totalExpenses += cost;
+
+            // Chart Aggregation
+            let key;
+            const tripDate = new Date(trip.timestamp);
+            if (viewMode === 'daily') {
+                key = tripDate.getHours();
+            } else {
+                key = tripDate.toLocaleDateString(undefined, { weekday: 'short' });
+            }
+
+            // Add to chart based on selected metric
+            let valToAdd = 0;
+            if (selectedMetric === 'earnings') valToAdd = earnings;
+            if (selectedMetric === 'net') valToAdd = net;
+            if (selectedMetric === 'miles') valToAdd = miles;
+            if (selectedMetric === 'expenses') valToAdd = cost;
+
+            if (chartMap[key] !== undefined) chartMap[key] += valToAdd;
+        });
+
+        // Convert Chart Map to Array
+        const chartData = Object.entries(chartMap).map(([label, value]) => ({ label, value }));
+
+        return {
+            totalEarnings,
+            totalMiles,
+            totalExpenses,
+            totalNet: totalEarnings - totalExpenses,
+            chartData,
+            tripCount: timeframeTrips.length
+        };
+    }, [allTrips, viewMode, selectedDate, selectedMetric, config]);
+
+    // Format Helpers
+    const formatCurrency = (val) => `$${val.toFixed(0)}`;
+    const formatNet = (val) => `$${val.toFixed(2)}`;
+
     return (
-        <div className="card glass-card">
-            <div className="flex-between" style={{ marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart2 size={16} color="var(--accent-color)" />
-                    {t.analytics}
-                </h3>
-
-                <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '2px', display: 'flex' }}>
-                    <button onClick={() => setPeriod('yesterday')} style={{ background: period === 'yesterday' ? 'var(--accent-color)' : 'transparent', color: period === 'yesterday' ? '#000' : 'var(--text-muted)', border: 'none', padding: '4px 12px', borderRadius: '2px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.3s ease' }}>
-                        {t.yesterday}
-                    </button>
-                    <button onClick={() => setPeriod('weekly')} style={{ background: period === 'weekly' ? 'var(--accent-color)' : 'transparent', color: period === 'weekly' ? '#000' : 'var(--text-muted)', border: 'none', padding: '4px 12px', borderRadius: '2px', fontSize: '10px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.3s ease' }}>
-                        {t.weeklyAvg}
-                    </button>
-                </div>
-            </div>
-
-            {/* Comparison Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-                <div style={{ background: 'rgba(0, 215, 117, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(0, 215, 117, 0.2)' }}>
-                    <div className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', color: '#00D775' }}>
-                        <span>Net Profit (Est.)</span>
-                        {renderComp(metrics.totalNetProfit, comparisonObj.net)}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                        <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#00D775', textShadow: '0 0 15px rgba(0, 215, 117, 0.4)' }}>
-                            ${metrics.totalNetProfit.toFixed(0)}<span style={{ fontSize: '16px' }}>.{metrics.totalNetProfit.toFixed(2).split('.')[1]}</span>
-                        </span>
-                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', fontWeight: '400' }}>
-                            / ${comparisonObj.net.toFixed(0)}
-                        </span>
-                    </div>
-                </div>
-                <div style={{ background: 'rgba(255, 77, 77, 0.1)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255, 77, 77, 0.2)' }}>
-                    <div className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', color: '#ff4d4d' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span>Pocket Cost</span>
-                            <button
-                                onClick={() => { setIsEditingGas(true); setTempGasPrice(config.gasPrice); }}
-                                style={{ background: 'none', border: 'none', color: '#ff4d4d', cursor: 'pointer', opacity: 0.7 }}
-                            >
-                                ✏️
-                            </button>
-                        </div>
-                        <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>AVG: ${comparisonObj.costs.toFixed(0)}</span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                        <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#ff4d4d', textShadow: '0 0 15px rgba(255, 77, 77, 0.4)' }}>
-                            ${metrics.totalOperatingCost.toFixed(0)}<span style={{ fontSize: '16px' }}>.{metrics.totalOperatingCost.toFixed(2).split('.')[1]}</span>
-                        </span>
-                    </div>
-                    <div style={{ fontSize: '9px', color: 'rgba(255,77,77,0.7)', marginTop: '4px' }}>
-                        {isEditingGas ? (
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={tempGasPrice}
-                                autoFocus
-                                onChange={(e) => setTempGasPrice(e.target.value)}
-                                onBlur={() => {
-                                    updateConfig({ gasPrice: parseFloat(tempGasPrice) });
-                                    setIsEditingGas(false);
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        updateConfig({ gasPrice: parseFloat(tempGasPrice) });
-                                        setIsEditingGas(false);
-                                    }
-                                }}
-                                style={{ width: '50px', fontSize: '10px', padding: '2px', borderRadius: '4px', border: 'none' }}
-                            />
-                        ) : (
-                            <span>Fuel (${config.gasPrice.toFixed(2)}/g) + Wear (${config.maintenanceCostPerMile}/mi)</span>
-                        )}
+        <div className="card glass-card" style={{ padding: '0', overflow: 'hidden' }}>
+            {/* 1. Header & Filters */}
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
+                {/* Top Row: Title + Toggle */}
+                <div className="flex-between" style={{ marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <BarChart2 size={16} color="var(--accent-color)" />
+                        ANÁLISIS
+                    </h3>
+                    <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '2px', display: 'flex' }}>
+                        <button
+                            onClick={() => setViewMode('daily')}
+                            style={{
+                                padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                                background: viewMode === 'daily' ? 'var(--accent-color)' : 'transparent',
+                                color: viewMode === 'daily' ? '#fff' : 'var(--text-muted)'
+                            }}
+                        >
+                            Día
+                        </button>
+                        <button
+                            onClick={() => setViewMode('weekly')}
+                            style={{
+                                padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                                background: viewMode === 'weekly' ? 'var(--accent-color)' : 'transparent',
+                                color: viewMode === 'weekly' ? '#fff' : 'var(--text-muted)'
+                            }}
+                        >
+                            Semana
+                        </button>
                     </div>
                 </div>
-            </div>
 
-            <div style={{ alignItems: 'center', marginBottom: '20px', background: 'linear-gradient(90deg, rgba(255,102,0,0.1) 0%, transparent 100%)', padding: '12px', borderRadius: '8px', borderLeft: '3px solid var(--accent-color)' }}>
+                {/* Second Row: Date Picker + Legend */}
                 <div className="flex-between">
-                    <div>
-                        <div className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase' }}>GROSS EARNINGS</div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', textShadow: '0 0 10px rgba(255,255,255,0.5)' }}>${metrics.totalEarnings.toFixed(0)}</div>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <Calendar size={14} color="var(--text-muted)" />
+                        <input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            style={{
+                                background: 'transparent', border: 'none', color: '#fff', fontSize: '12px', fontFamily: 'inherit', padding: 0, margin: 0, width: 'auto'
+                            }}
+                        />
                     </div>
-                    <div className="text-right">
-                        <div className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{period === 'yesterday' ? t.vsYesterday : t.vsAverage}</div>
-                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--text-secondary)' }}>${comparisonObj.earnings.toFixed(0)}</div>
-                    </div>
-                </div>
-                <div style={{ fontSize: '12px', marginTop: '4px', textAlign: 'right', color: (metrics.totalEarnings - comparisonObj.earnings) >= 0 ? 'var(--accent-color)' : 'var(--error-color)', fontWeight: 'bold' }}>
-                    {(metrics.totalEarnings - comparisonObj.earnings) >= 0 ? '+' : ''}{(metrics.totalEarnings - comparisonObj.earnings).toFixed(0)}
                 </div>
             </div>
 
-            {/* 3D Chart Section */}
-            <div>
-                <div className="text-muted" style={{ fontSize: '12px', marginBottom: '12px' }}>{t.hourlyEarnings} (3D)</div>
-                <div className="chart-container">
-                    {chartData.length > 0 ? chartData.map((d, i) => {
-                        const maxVal = Math.max(...chartData.map(o => o.amount), 1); // Avoid div by 0
-                        const heightPct = (d.amount / maxVal) * 100;
+            {/* 2. Key Metrics Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--border-color)' }}>
+                {['earnings', 'net', 'expenses', 'miles'].map(metric => {
+                    const isActive = selectedMetric === metric;
+                    let val = 0;
+                    let label = '';
+                    let color = '';
+
+                    if (metric === 'earnings') { val = filteredData.totalEarnings; label = 'Bruto'; color = '#fff'; }
+                    if (metric === 'net') { val = filteredData.totalNet; label = 'Neto'; color = '#00D775'; }
+                    if (metric === 'expenses') { val = filteredData.totalExpenses; label = 'Gastos'; color = '#ff4d4d'; }
+                    if (metric === 'miles') { val = filteredData.totalMiles; label = 'Millas'; color = '#00d2ff'; }
+
+                    return (
+                        <button
+                            key={metric}
+                            onClick={() => setSelectedMetric(metric)}
+                            style={{
+                                background: isActive ? 'rgba(255,255,255,0.08)' : 'var(--bg-card)',
+                                border: 'none', padding: '12px 4px', cursor: 'pointer', textAlign: 'center',
+                                borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>{label}</div>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: color }}>
+                                {metric === 'miles' ? val.toFixed(1) : `$${val.toFixed(0)}`}
+                            </div>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {/* 3. Main Chart */}
+            <div style={{ padding: '20px', minHeight: '250px' }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '16px', textAlign: 'center' }}>
+                    {viewMode === 'daily' ? `Por Hora (${selectedMetric})` : `Por Día (${selectedMetric})`}
+                </div>
+
+                <div className="chart-container" style={{ height: '200px' }}>
+                    {filteredData.chartData.length > 0 ? filteredData.chartData.map((d, i) => {
+                        const maxVal = Math.max(...filteredData.chartData.map(o => o.value), 10);
+                        const heightPct = (d.value / maxVal) * 100;
 
                         return (
                             <div key={i} className="bar-group">
                                 <div className="bar-wrapper">
-                                    {d.amount > 0 && (
+                                    {d.value > 0 && (
                                         <div style={{
-                                            position: 'absolute',
-                                            bottom: `${Math.max(heightPct, 2)}%`,
-                                            marginBottom: '12px',
-                                            color: 'var(--accent-color)',
-                                            fontSize: '10px',
-                                            fontWeight: 'bold',
-                                            textShadow: '0 0 5px rgba(0,0,0,0.5)',
-                                            transform: 'translateZ(20px)', // Bring forward
-                                            whiteSpace: 'nowrap'
+                                            position: 'absolute', bottom: `${Math.max(heightPct, 5)}%`, marginBottom: '8px',
+                                            fontSize: '9px', fontWeight: 'bold', color: '#fff', textShadow: '0 0 4px rgba(0,0,0,0.8)'
                                         }}>
-                                            ${d.amount.toFixed(0)}
+                                            {selectedMetric === 'miles' ? d.value.toFixed(0) : `$${d.value.toFixed(0)}`}
                                         </div>
                                     )}
-                                    <div className="bar-3d" style={{ height: `${Math.max(heightPct, 2)}%` }}>
-                                        <div className="bar-top"></div>
+                                    <div className="bar-3d" style={{
+                                        height: `${Math.max(heightPct, 2)}%`,
+                                        background: selectedMetric === 'expenses' ? 'linear-gradient(to top, #800000, #ff4d4d)' :
+                                            selectedMetric === 'net' ? 'linear-gradient(to top, #004d29, #00D775)' : undefined
+                                    }}>
+                                        <div className="bar-top" style={{ background: '#fff' }}></div>
                                     </div>
                                 </div>
-                                <span className="bar-label">{d.hour}</span>
+                                <span className="bar-label" style={{ fontSize: '9px' }}>{d.label}</span>
                             </div>
                         );
                     }) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>
-                            Start driving to see data
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', width: '100%', fontStyle: 'italic' }}>
+                            Sin datos para este periodo
                         </div>
                     )}
+                </div>
+            </div>
+
+            {/* 4. Edit Config Quick Access */}
+            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Configuración de Costos:</span>
+                <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ color: '#ff4d4d' }}>Gas:</span>
+                        {isEditingGas ? (
+                            <input
+                                type="number" value={tempGasPrice}
+                                onChange={e => setTempGasPrice(e.target.value)}
+                                onBlur={() => { updateConfig({ gasPrice: parseFloat(tempGasPrice) }); setIsEditingGas(false); }}
+                                onKeyDown={e => { if (e.key === 'Enter') { updateConfig({ gasPrice: parseFloat(tempGasPrice) }); setIsEditingGas(false); } }}
+                                style={{ width: '40px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px' }}
+                                autoFocus
+                            />
+                        ) : (
+                            <span onClick={() => { setIsEditingGas(true); setTempGasPrice(config.gasPrice); }} style={{ cursor: 'pointer', borderBottom: '1px dashed #666' }}>
+                                ${config.gasPrice}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
