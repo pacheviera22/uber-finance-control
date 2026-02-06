@@ -30,7 +30,11 @@ export default function HomeMenu({ onNavigate }) {
 
             {/* 2. Status Card (Prominent Center) */}
             <div className="status-section">
-                <div className="status-card glow-border">
+                <div
+                    className="status-card glow-border"
+                    onClick={() => onNavigate('dashboard')}
+                    style={{ cursor: 'pointer' }}
+                >
                     <div className="status-header">
                         <span className="status-label">TURNO ACTUAL</span>
                         {session.status === 'active' && <Car size={20} className="status-icon-active" />}
