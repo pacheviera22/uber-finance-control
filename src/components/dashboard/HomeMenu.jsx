@@ -2,8 +2,44 @@ import React from 'react';
 import { Power, BarChart2, History, Menu, Car } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 
+// Simple Stale Session Modal
+const StaleSessionModal = ({ onConfirm, onCancel, durationHours }) => (
+    <div style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+        background: 'rgba(0,0,0,0.9)', zIndex: 2000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+    }}>
+        <div className="glass-card" style={{ maxWidth: '320px', textAlign: 'center', padding: '24px' }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+            <h3 style={{ marginBottom: '12px', color: '#fff' }}>¿Sesión Olvidada?</h3>
+            <p style={{ color: 'var(--text-muted)', marginBottom: '24px' }}>
+                Tienes un turno activo de <strong>{durationHours} horas</strong>.
+                <br /><br />
+                ¿Quieres finalizarlo ahora para empezar uno nuevo?
+            </p>
+            <div style={{ display: 'grid', gap: '12px' }}>
+                <button
+                    onClick={onConfirm}
+                    className="btn-primary"
+                    style={{ background: 'var(--warning-color)', color: 'white', border: 'none' }}
+                >
+                    Sí, Finalizar Turno
+                </button>
+                <button
+                    onClick={onCancel}
+                    style={{ background: 'none', border: '1px solid #444', color: '#888', padding: '12px', borderRadius: '12px' }}
+                >
+                    No, Continuar
+                </button>
+            </div>
+        </div>
+    </div>
+);
+
 export default function HomeMenu({ onNavigate }) {
-    const { session, metrics } = useFinance();
+    const { session, metrics, actions } = useFinance();
+    const [showStaleModal, setShowStaleModal] = React.useState(false);
+    const [staleDuration, setStaleDuration] = React.useState(0);
 
     // Helper for Session Status Text
     const getSessionStatus = () => {
@@ -14,14 +50,39 @@ export default function HomeMenu({ onNavigate }) {
 
     const getSessionTime = () => {
         if (session.startTime) {
-            // Simple elapsed time calculation could go here, for now just show start time
             return new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
         return '--:--';
     };
 
+    // Stale Check on Mount
+    React.useEffect(() => {
+        if (session.status === 'active' || session.status === 'paused') {
+            const now = Date.now();
+            const hours = (now - session.startTime) / 3600000;
+            if (hours > 16) { // threshold: 16 hours
+                setStaleDuration(hours.toFixed(1));
+                setShowStaleModal(true);
+            }
+        }
+    }, [session.status, session.startTime]);
+
+    const handleEndStale = () => {
+        // Force End
+        actions.endShift();
+        setShowStaleModal(false);
+    };
+
     return (
         <div className="home-container">
+            {showStaleModal && (
+                <StaleSessionModal
+                    durationHours={staleDuration}
+                    onConfirm={handleEndStale}
+                    onCancel={() => setShowStaleModal(false)}
+                />
+            )}
+
             {/* 1. Header Section */}
             <header className="home-header">
                 <h1>Bienvenido, Usuario</h1>
