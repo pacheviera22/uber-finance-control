@@ -58,6 +58,9 @@ export const FinanceProvider = ({ children }) => {
     const [trips, setTrips] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Daily Records State
+    const [dailyRecords, setDailyRecords] = useState({});
+
     // Initial Load & Realtime Subscription
     useEffect(() => {
         const loadDat = async () => {
@@ -83,13 +86,11 @@ export const FinanceProvider = ({ children }) => {
                     gpsMiles: Number(sessionData.gps_miles || 0)
                 });
             } else if (sessionError && sessionError.code === 'PGRST116') {
-                // Row not found? Create it safely if not exists? 
-                // We rely on the SQL script having run "insert into sessions..."
                 console.warn("Session row not found. Did you run the SQL script?");
             }
 
             // 2. Get Trips
-            const { data: tripsData, error: tripsError } = await supabase
+            const { data: tripsData } = await supabase
                 .from('trips')
                 .select('*')
                 .order('timestamp', { ascending: true });
@@ -106,12 +107,28 @@ export const FinanceProvider = ({ children }) => {
                 })));
             }
 
+            // 3. Get Daily Records
+            const { data: dailyData } = await supabase
+                .from('daily_records')
+                .select('*');
+
+            if (dailyData) {
+                const recordsMap = {};
+                dailyData.forEach(r => {
+                    recordsMap[r.date] = {
+                        gasPrice: Number(r.gas_price),
+                        notes: r.notes
+                    };
+                });
+                setDailyRecords(recordsMap);
+            }
+
             setLoading(false);
         };
 
         loadDat();
 
-        // 3. Realtime Subscription
+        // 4. Realtime Subscription
         const channel = supabase
             .channel('uber_finance_updates')
             .on(
@@ -137,9 +154,6 @@ export const FinanceProvider = ({ children }) => {
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'trips' },
                 (payload) => {
-                    // Simple approach: reload all trips on any change to ensure consistency
-                    // Or manage state optimistically. For MVP, reload is safest or simple append.
-                    // Let's do a smart merge for MVP.
                     if (payload.eventType === 'INSERT') {
                         const newTrip = {
                             ...payload.new,
@@ -164,6 +178,21 @@ export const FinanceProvider = ({ children }) => {
                             mpg: Number(payload.new.mpg || 24)
                         };
                         setTrips(prev => prev.map(t => t.id === updated.id ? updated : t));
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'daily_records' },
+                (payload) => {
+                    if (payload.new) {
+                        setDailyRecords(prev => ({
+                            ...prev,
+                            [payload.new.date]: {
+                                gasPrice: Number(payload.new.gas_price),
+                                notes: payload.new.notes
+                            }
+                        }));
                     }
                 }
             )
@@ -358,6 +387,15 @@ export const FinanceProvider = ({ children }) => {
         });
     };
 
+    const updateDailyRecord = async (date, data) => {
+        const { error } = await supabase
+            .from('daily_records')
+            .upsert({ date, gas_price: data.gasPrice, notes: data.notes })
+            .select();
+
+        if (error) console.error("Error updating daily record", error);
+    };
+
     // Metrics Calculation
     const currentTrips = session.startTime
         ? trips.filter(t => t.timestamp >= session.startTime) // Filter in memory for MVP
@@ -431,6 +469,7 @@ export const FinanceProvider = ({ children }) => {
             session,
             trips: currentTrips,
             allTrips: trips,
+            dailyRecords,
             actions: {
                 startShift,
                 pauseShift,
@@ -442,7 +481,8 @@ export const FinanceProvider = ({ children }) => {
                 updateStartTime,
                 updateStartOdometer,
                 updateEndTime,
-                updateConfig
+                updateConfig,
+                updateDailyRecord
             },
             metrics: {
                 totalEarnings,

@@ -3,7 +3,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { TrendingUp, TrendingDown, BarChart2, Calendar, DollarSign, Activity, Settings } from 'lucide-react';
 
 export default function MetricsComparison() {
-    const { allTrips, metrics, session, t, config, actions: { updateConfig } } = useFinance();
+    const { allTrips, metrics, session, t, config, dailyRecords, actions: { updateConfig, updateDailyRecord } } = useFinance();
 
     // State for Config/Filters
     const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'weekly'
@@ -11,7 +11,21 @@ export default function MetricsComparison() {
     const [selectedMetric, setSelectedMetric] = useState('earnings'); // 'earnings' | 'net' | 'miles' | 'expenses'
 
     const [isEditingGas, setIsEditingGas] = useState(false);
-    const [tempGasPrice, setTempGasPrice] = useState(config.gasPrice);
+
+    // Derived Gas Price: Check Daily Record -> Fallback to Config
+    // Safe check if dailyRecords is loaded
+    const dailyPriceRecord = dailyRecords && dailyRecords[selectedDate];
+    const effectiveGasPrice = dailyPriceRecord ? dailyPriceRecord.gasPrice : config.gasPrice;
+
+    // Temp state for editing
+    const [tempGasPrice, setTempGasPrice] = useState(effectiveGasPrice);
+
+    // Sync temp price when selection changes (unless editing)
+    React.useEffect(() => {
+        if (!isEditingGas) {
+            setTempGasPrice(effectiveGasPrice);
+        }
+    }, [effectiveGasPrice, isEditingGas]);
 
     // --- Helpers ---
     const getStartEndTimestamps = (mode, dateStr) => {
@@ -52,8 +66,7 @@ export default function MetricsComparison() {
         if (viewMode === 'daily') {
             for (let i = 0; i < 24; i++) chartMap[i] = 0;
         } else {
-            // Weekly: 0 (Sun) to 6 (Sat) or 0 (Mon) to 6 (Sun). Let's use Date Index 0-6.
-            // Simplified: Map Date String to Value
+            // Weekly
             for (let i = 0; i < 7; i++) {
                 const d = new Date(start + i * 86400000);
                 const k = d.toLocaleDateString(undefined, { weekday: 'short' });
@@ -65,13 +78,16 @@ export default function MetricsComparison() {
         timeframeTrips.forEach(trip => {
             // Calc Financials
             const earnings = trip.amount || 0;
-            const dist = trip.distance || 0; // Assuming we have trip distance logic or using odometer diff if sequential
-            // Fallback for distance if per-trip distance not stored explicitly, use estimated avg or 0
-            // Note: Odometer calc is tricky per-trip if not strictly sequential. 
-            // Using placeholder logic: avg 5 miles per trip or user input if available.
+            const dist = trip.distance || 0;
             const miles = dist > 0 ? dist : 5; // Fallback
 
-            const cost = (miles / config.vehicleMpg * config.gasPrice) + (miles * config.maintenanceCostPerMile);
+            // Look up gas price for THIS trip's day
+            const tripDateKey = new Date(trip.timestamp).toISOString().split('T')[0];
+            const priceForDay = dailyRecords && dailyRecords[tripDateKey]
+                ? dailyRecords[tripDateKey].gasPrice
+                : config.gasPrice;
+
+            const cost = (miles / config.vehicleMpg * priceForDay) + (miles * config.maintenanceCostPerMile);
             const net = earnings - cost;
 
             totalEarnings += earnings;
@@ -108,11 +124,21 @@ export default function MetricsComparison() {
             chartData,
             tripCount: timeframeTrips.length
         };
-    }, [allTrips, viewMode, selectedDate, selectedMetric, config]);
+    }, [allTrips, viewMode, selectedDate, selectedMetric, config, dailyRecords]);
 
     // Format Helpers
     const formatCurrency = (val) => `$${val.toFixed(0)}`;
     const formatNet = (val) => `$${val.toFixed(2)}`;
+
+    // Handle Gas Price Update
+    const handleGasUpdate = () => {
+        const val = parseFloat(tempGasPrice);
+        if (!isNaN(val)) {
+            // Save to Daily Record
+            updateDailyRecord(selectedDate, { gasPrice: val });
+        }
+        setIsEditingGas(false);
+    }
 
     return (
         <div className="card glass-card" style={{ padding: '0', overflow: 'hidden' }}>
@@ -238,25 +264,34 @@ export default function MetricsComparison() {
                 </div>
             </div>
 
-            {/* 4. Edit Config Quick Access */}
+            {/* 4. Edit Config Quick Access (DAILY OVERRIDE) */}
             <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Configuración de Costos:</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Precio Gas ({dailyPriceRecord ? 'Diario' : 'Global'}):
+                </span>
                 <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ color: '#ff4d4d' }}>Gas:</span>
+                        <span style={{ color: '#ff4d4d' }}>$</span>
                         {isEditingGas ? (
                             <input
-                                type="number" value={tempGasPrice}
+                                type="number"
+                                value={tempGasPrice ?? effectiveGasPrice ?? 0}
                                 onChange={e => setTempGasPrice(e.target.value)}
-                                onBlur={() => { updateConfig({ gasPrice: parseFloat(tempGasPrice) }); setIsEditingGas(false); }}
-                                onKeyDown={e => { if (e.key === 'Enter') { updateConfig({ gasPrice: parseFloat(tempGasPrice) }); setIsEditingGas(false); } }}
-                                style={{ width: '40px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px' }}
+                                onBlur={handleGasUpdate}
+                                onKeyDown={e => { if (e.key === 'Enter') handleGasUpdate(); }}
+                                style={{ width: '45px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px' }}
                                 autoFocus
                             />
                         ) : (
-                            <span onClick={() => { setIsEditingGas(true); setTempGasPrice(config.gasPrice); }} style={{ cursor: 'pointer', borderBottom: '1px dashed #666' }}>
-                                ${config.gasPrice}
-                            </span>
+                            <div
+                                onClick={() => { setIsEditingGas(true); setTempGasPrice(effectiveGasPrice); }}
+                                style={{
+                                    cursor: 'pointer', borderBottom: '1px dashed #666', fontWeight: 'bold',
+                                    color: dailyPriceRecord ? 'var(--accent-color)' : '#fff'
+                                }}
+                            >
+                                {effectiveGasPrice?.toFixed(2)}
+                            </div>
                         )}
                     </div>
                 </div>
