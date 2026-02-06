@@ -32,7 +32,7 @@ export default function Header() {
                 </div>
             </div>
 
-            {/* Progress Bar */}
+            {/* Daily Progress Bar */}
             <div style={{
                 height: '8px',
                 background: '#333',
@@ -63,6 +63,31 @@ export default function Header() {
                     </span>
                 )}
             </div>
+
+            {/* Weekly Progress Section - Collapsible or Compact */}
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="flex-between" style={{ marginBottom: '4px' }}>
+                    <span className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{t.weeklyProgress}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        ${metrics.weeklyEarnings.toFixed(0)} / ${metrics.weeklyGoal}
+                    </span>
+                </div>
+                <div style={{
+                    height: '4px',
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: '2px',
+                    overflow: 'hidden'
+                }}>
+                    <div style={{
+                        height: '100%',
+                        width: `${Math.min(100, (metrics.weeklyEarnings / metrics.weeklyGoal) * 100)}%`,
+                        background: '#0078D7', // Blue for Weekly to differentiate
+                        boxShadow: '0 0 5px rgba(0, 120, 215, 0.5)',
+                        transition: 'width 0.5s ease-out'
+                    }} />
+                </div>
+            </div>
+
         </header>
     );
 }

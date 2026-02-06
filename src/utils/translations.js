@@ -7,6 +7,9 @@ export const translations = {
 
         // Start Shift
         startShift: "Start Shift",
+        startNewShift: "Start New Shift",
+        resumePrevious: "Resume Previous Shift",
+        resumeDescription: "Retrieve your last session data.",
         setTargets: "Set your targets for today",
         dailyGoal: "Daily Goal ($)",
         startOdometer: "Start Odometer",
@@ -38,8 +41,28 @@ export const translations = {
         milesDriven: "Miles Driven",
         odo: "Odo",
 
+        // End Shift
+        endShift: "End Shift",
+        confirmEndShift: "Confirm & End Shift",
+        totalEarnings: "Total Earnings",
+        miles: "Miles",
+        shiftSummary: "Shift Summary",
+
         // General
-        language: "Language"
+        language: "Language",
+        update: "Update",
+        cancel: "Cancel",
+
+        // Weekly & History
+        weeklyGoal: "Weekly Goal ($)",
+        weeklyAccumulated: "Weekly Accumulated",
+        viewHistory: "View/Edit History",
+        historyDescription: "Manage past shifts",
+        weeklyProgress: "Weekly Progress",
+        // Platforms
+        platform: "Platform",
+        cash: "Cash",
+        card: "Card"
     },
     es: {
         // Header
@@ -49,7 +72,23 @@ export const translations = {
 
         // Start Shift
         startShift: "Iniciar Turno",
+        startNewShift: "Iniciar Nuevo Turno",
+        resumePrevious: "Reanudar Turno Anterior",
+        resumeDescription: "Recuperar datos de la última sesión.",
         setTargets: "Define tus objetivos de hoy",
+        // Analytics
+        analytics: "Análisis",
+        yesterday: "Ayer",
+        weeklyAvg: "Prom. Semanal",
+        currentShift: "Turno Actual",
+        vsYesterday: "vs Ayer",
+        vsAverage: "vs Promedio",
+        ahead: "Adelante",
+        behind: "Atrás",
+        hourlyEarnings: "Ganancia por Hora",
+        perMile: "por Milla",
+        perHour: "por Hora",
+        hour: "Hora",
         dailyGoal: "Meta Diaria ($)",
         startOdometer: "Odómetro Inicial",
         startTime: "Hora de Inicio",
@@ -79,8 +118,34 @@ export const translations = {
         dollarsPerMile: "$/Milla",
         milesDriven: "Millas Recorridas",
         odo: "Odo",
+        edit: "Editar",
+        date: "Fecha",
+        time: "Hora",
+        delete: "Eliminar",
+        confirmDelete: "¿Estás seguro de que quieres eliminar este viaje?",
+        history: "Historial",
+
+        // End Shift
+        endShift: "Finalizar Turno",
+        confirmEndShift: "Confirmar y Finalizar",
+        totalEarnings: "Ganancia Total",
+        miles: "Millas",
+        shiftSummary: "Resumen del Turno",
 
         // General
-        language: "Idioma"
+        language: "Idioma",
+        update: "Actualizar",
+        cancel: "Cancelar",
+
+        // Weekly & History
+        weeklyGoal: "Meta Semanal ($)",
+        weeklyAccumulated: "Acumulado Semanal",
+        viewHistory: "Ver/Editar Historial",
+        historyDescription: "Gestionar turnos anteriores",
+        weeklyProgress: "Progreso Semanal",
+        // Platforms
+        platform: "Plataforma",
+        cash: "Efectivo",
+        card: "Tarjeta"
     }
 };

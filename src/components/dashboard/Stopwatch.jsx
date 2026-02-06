@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { Pause, Play, Edit2, X, Check } from 'lucide-react';
+import { Pause, Play, Edit2, Flag } from 'lucide-react';
+import EndShiftModal from './EndShiftModal';
 
 export default function Stopwatch() {
     const { session, actions, metrics, t } = useFinance();
     const [elapsed, setElapsed] = useState(0);
     const [isEditing, setIsEditing] = useState(false);
+    const [isEndModalOpen, setIsEndModalOpen] = useState(false);
+
+    // Edit state
     const [editTimeStr, setEditTimeStr] = useState('');
     const [editOdometer, setEditOdometer] = useState('');
     const [editEndTimeStr, setEditEndTimeStr] = useState('');
@@ -53,7 +57,6 @@ export default function Stopwatch() {
         // However, if we just show time, we might lose date info if it's overnight.
         // Let's stick to time input for simplicity as per StartShiftModal, 
         // OR better, use toLocalISO for consistency if we want full control.
-        // StartShiftModal used separate Time input. Here let's try to match that or use full datetime.
         // Given backdating context, full datetime is safer.
         setEditEndTimeStr(session.endTime ? toLocalISO(session.endTime) : '');
         setIsEditing(true);
@@ -89,6 +92,9 @@ export default function Stopwatch() {
 
     return (
         <div className="card glass-card text-center" style={{ padding: '32px 16px', position: 'relative' }}>
+
+            {/* End Shift Modal */}
+            <EndShiftModal isOpen={isEndModalOpen} onClose={() => setIsEndModalOpen(false)} />
 
             {/* Header with Edit Button */}
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -168,6 +174,29 @@ export default function Stopwatch() {
                         {t.resume}
                     </button>
                 )}
+            </div>
+
+            {/* End Shift Button */}
+            <div style={{ marginBottom: '24px' }}>
+                <button
+                    onClick={() => setIsEndModalOpen(true)}
+                    style={{
+                        background: 'none',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--text-muted)',
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        margin: '0 auto',
+                        cursor: 'pointer'
+                    }}
+                >
+                    <Flag size={14} />
+                    {t.endShift}
+                </button>
             </div>
 
             <div style={{

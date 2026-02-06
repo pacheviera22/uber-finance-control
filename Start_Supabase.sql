@@ -4,7 +4,10 @@ create table public.trips (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   amount numeric not null,
   odometer numeric not null,
-  timestamp bigint not null
+  timestamp bigint not null,
+  distance numeric default 0,
+  gas_price numeric default 0,
+  mpg numeric default 24
 );
 
 -- Create Session Table (Single row implementation for MVP)

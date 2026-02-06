@@ -1,101 +1,92 @@
 import React, { useState } from 'react';
-import { FinanceProvider, useFinance } from './context/FinanceContext';
-import Header from './components/layout/Header';
-import StartShiftModal from './components/dashboard/StartShiftModal';
-import Stopwatch from './components/dashboard/Stopwatch';
-import MetricCard from './components/dashboard/MetricCard';
-import TripList from './components/dashboard/TripList';
-import TripForm from './components/dashboard/TripForm';
-import HistoryModal from './components/dashboard/HistoryModal';
-import { Plus, History } from 'lucide-react';
+import { FinanceProvider } from './context/FinanceContext';
+import HomeMenu from './components/dashboard/HomeMenu';
+import ShiftDashboard from './components/dashboard/ShiftDashboard';
+import HistoryModal from './components/dashboard/HistoryModal'; // Importing directly to re-use if needed or just use ShiftDashboard's modal
 
-function Dashboard() {
-  const { session, metrics, t } = useFinance();
-  const [showAddTrip, setShowAddTrip] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+// Simple Error Boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
 
-  // Derived metrics for UI
-  const earningsPerMile = metrics.milesDriven > 0
-    ? (metrics.totalEarnings / metrics.milesDriven)
-    : 0;
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '20px', color: 'red', background: 'white', overflow: 'auto' }}>
+          <h1>Something went wrong.</h1>
+          <pre>{this.state.error && this.state.error.toString()}</pre>
+          <pre>{this.state.error && this.state.error.stack}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AppContent() {
+  const [currentView, setCurrentView] = useState('home'); // 'home', 'dashboard', 'history', 'stats', 'settings'
+
+  const handleNavigate = (view) => {
+    setCurrentView(view);
+  };
 
   return (
-    <div className="container">
-      {session.status === 'idle' && <StartShiftModal />}
-
-      <Header />
-      <Stopwatch />
-
-      {/* Metrics Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-        <MetricCard
-          label={t.dollarsPerMile}
-          value={`$${earningsPerMile.toFixed(2)}`}
-        />
-        <MetricCard
-          label={t.milesDriven}
-          value={metrics.milesDriven.toFixed(1)}
-          subtext={`${t.odo}: ${metrics.lastOdometer}`}
-        />
-      </div>
-
-      <TripList />
-
-      {/* History Button */}
-      <button
-        onClick={() => setShowHistory(true)}
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '24px',
-          width: '48px',
-          height: '48px',
-          borderRadius: '50%',
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 100,
-          cursor: 'pointer'
-        }}
-      >
-        <History size={20} color="var(--text-primary)" />
-      </button>
-
-      {/* FAB: Add Trip */}
-      {session.status !== 'idle' && (
-        <button
-          onClick={() => setShowAddTrip(true)}
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'var(--accent-color)',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px var(--accent-glow)',
-            zIndex: 100,
-            cursor: 'pointer'
-          }}
-        >
-          <Plus size={32} color="black" />
-        </button>
+    <>
+      {currentView === 'home' && (
+        <HomeMenu onNavigate={handleNavigate} />
       )}
 
-      {showHistory && <HistoryModal onClose={() => setShowHistory(false)} />}
-      {showAddTrip && <TripForm onClose={() => setShowAddTrip(false)} />}
-    </div>
+      {currentView === 'dashboard' && (
+        <ShiftDashboard onBack={() => setCurrentView('home')} />
+      )}
+
+      {/* For now, map 'history' and 'stats' back to dashboard or placeholders until dedicated pages exist */}
+      {currentView === 'history' && (
+        // Re-using ShiftDashboard but maybe we want to open the modal immediately?
+        // For simplicity, let's just go to dashboard and open history manually or maybe pass a prop?
+        // Let's keep it simple: Go to Dashboard for now as it contains the history.
+        // OR better: Create a wrapper or pass a prop to ShiftDashboard to auto-open history.
+        // But the user asked for "pages". Let's use the ShiftDashboard as the main "Work" view.
+        // But for "History" specifically, maybe we can just show the HistoryModal over the Home?
+        // Let's implement a simple placeholder for now or redirect to dashboard.
+        // Let's try to render ShiftDashboard and maybe we can control it?
+        // Actually, let's just make 'history' open the dashboard with history modal open?
+        // For this iteration, let's just map everything to Dashboard if it's not implemented yet, or show a "Coming Soon" for settings.
+
+        <ShiftDashboard onBack={() => setCurrentView('home')} />
+      )}
+
+      {currentView === 'stats' && (
+        <ShiftDashboard onBack={() => setCurrentView('home')} />
+      )}
+
+      {currentView === 'settings' && (
+        <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+          <button onClick={() => setCurrentView('home')} style={{ marginBottom: 20, background: 'none', border: 'none', color: 'white', fontSize: 20 }}>← Volver</button>
+          <h1>Configuración</h1>
+          <p>Próximamente...</p>
+        </div>
+      )}
+    </>
   );
 }
 
 export default function App() {
   return (
     <FinanceProvider>
-      <Dashboard />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </FinanceProvider>
   );
 }

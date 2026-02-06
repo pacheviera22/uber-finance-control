@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { X, Trash2, Edit2, Calendar, AlertTriangle } from 'lucide-react';
+import { X, Trash2, Edit2, Calendar, AlertTriangle, Plus, Banknote, Car } from 'lucide-react';
 import TripForm from './TripForm';
 
 export default function HistoryModal({ onClose }) {
     const { allTrips, actions, t } = useFinance();
     const [editingTrip, setEditingTrip] = useState(null);
+    const [showAddTrip, setShowAddTrip] = useState(false);
     const [deleteConfirmationId, setDeleteConfirmationId] = useState(null);
 
     // Group trips by Date
@@ -35,9 +36,29 @@ export default function HistoryModal({ onClose }) {
             {/* Header */}
             <div className="flex-between" style={{ marginBottom: '20px' }}>
                 <h2 style={{ fontSize: '24px' }}>{t.history}</h2>
-                <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}>
-                    <X size={28} />
-                </button>
+                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                    <button
+                        onClick={() => setShowAddTrip(true)}
+                        style={{
+                            background: 'var(--accent-color)',
+                            border: 'none',
+                            color: 'white',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: '0 0 10px var(--accent-glow)'
+                        }}
+                    >
+                        <Plus size={20} />
+                    </button>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-muted)' }}>
+                        <X size={28} />
+                    </button>
+                </div>
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -63,41 +84,62 @@ export default function HistoryModal({ onClose }) {
 
                         {groupedTrips[date]
                             .sort((a, b) => b.timestamp - a.timestamp)
-                            .map(trip => (
-                                <div key={trip.id} className="card" style={{ padding: '16px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <div>
-                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--accent-color)' }}>
-                                            ${trip.amount.toFixed(2)}
-                                        </div>
-                                        <div className="text-muted" style={{ fontSize: '12px' }}>
-                                            {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {trip.odometer} {t.odo}
-                                        </div>
-                                    </div>
+                            .map(trip => {
+                                const isCash = trip.platform === 'cash';
+                                const isLyft = trip.platform === 'lyft';
+                                const color = isCash ? '#00D775' : (isLyft ? '#FF00BF' : 'var(--text-primary)');
+                                const Icon = isCash ? Banknote : Car;
 
-                                    <div style={{ display: 'flex', gap: '16px' }}>
-                                        <button
-                                            onClick={() => setEditingTrip(trip)}
-                                            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
-                                        >
-                                            <Edit2 size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setDeleteConfirmationId(trip.id)}
-                                            style={{ background: 'none', border: 'none', color: 'var(--error-color)', cursor: 'pointer' }}
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+                                return (
+                                    <div key={trip.id} className="card" style={{ padding: '16px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                            <div style={{
+                                                width: '32px', height: '32px',
+                                                borderRadius: '50%',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                color: color
+                                            }}>
+                                                <Icon size={16} />
+                                            </div>
+                                            <div>
+                                                <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--accent-color)' }}>
+                                                    ${trip.amount.toFixed(2)}
+                                                </div>
+                                                <div className="text-muted" style={{ fontSize: '12px' }}>
+                                                    {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {trip.odometer} {t.odo}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '16px' }}>
+                                            <button
+                                                onClick={() => setEditingTrip(trip)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                                            >
+                                                <Edit2 size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => setDeleteConfirmationId(trip.id)}
+                                                style={{ background: 'none', border: 'none', color: 'var(--error-color)', cursor: 'pointer' }}
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                     </div>
                 ))}
             </div>
 
-            {editingTrip && (
+            {(editingTrip || showAddTrip) && (
                 <TripForm
                     initialData={editingTrip}
-                    onClose={() => setEditingTrip(null)}
+                    onClose={() => {
+                        setEditingTrip(null);
+                        setShowAddTrip(false);
+                    }}
                 />
             )}
 
