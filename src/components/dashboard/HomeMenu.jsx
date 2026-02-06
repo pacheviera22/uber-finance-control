@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, History, BarChart2, Settings } from 'lucide-react';
+import { Power, BarChart2, History, Menu, Car } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 
 export default function HomeMenu({ onNavigate }) {
@@ -7,102 +7,95 @@ export default function HomeMenu({ onNavigate }) {
 
     // Helper for Session Status Text
     const getSessionStatus = () => {
-        if (session.status === 'active') return 'En Curso';
+        if (session.status === 'active') return 'En Progreso';
         if (session.status === 'paused') return 'Pausado';
-        return 'Iniciar Turno';
+        return 'Listo para Iniciar';
     };
 
     const getSessionTime = () => {
         if (session.startTime) {
+            // Simple elapsed time calculation could go here, for now just show start time
             return new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
         return '--:--';
     };
 
     return (
-        <div className="home-menu-container">
-            <div className="home-header">
-                <h1>Seguimiento Laboral</h1>
-                <p className="subtitle">Bienvenido, Conductor</p>
+        <div className="home-container">
+            {/* 1. Header Section */}
+            <header className="home-header">
+                <h1>Bienvenido, Usuario</h1>
+                <p className="subtitle">Driver Pro Control</p>
+            </header>
+
+            {/* 2. Status Card (Prominent Center) */}
+            <div className="status-section">
+                <div className="status-card glow-border">
+                    <div className="status-header">
+                        <span className="status-label">TURNO ACTUAL</span>
+                        {session.status === 'active' && <Car size={20} className="status-icon-active" />}
+                    </div>
+
+                    <div className="status-main">
+                        <h2 className={session.status === 'active' ? 'text-active' : 'text-idle'}>
+                            {getSessionStatus()}
+                        </h2>
+                        {session.status === 'active' && (
+                            <div className="status-details">
+                                <span className="time-display">{getSessionTime()}</span>
+                                <span className="miles-display">{metrics.milesDriven.toFixed(1)} mi</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
 
-            <div className="menu-grid">
-                {/* Card 1: Current Shift */}
-                <div
-                    className="menu-card shift-card"
+            {/* 3. Action Grid (2x2 Menu) */}
+            <div className="action-grid">
+                {/* Button 1: Start/Action */}
+                <button
+                    className={`grid-btn btn-start ${session.status === 'active' ? 'active-glow' : ''}`}
                     onClick={() => onNavigate('dashboard')}
                 >
-                    <div className="card-content">
-                        <div className="card-icon-wrapper shift-icon">
-                            <Play size={40} className={session.status === 'active' ? 'icon-pulse' : ''} />
-                        </div>
-                        <div className="card-text">
-                            <h2>Turno Actual</h2>
-                            <span className={`status-badge ${session.status}`}>
-                                {getSessionStatus()}
-                            </span>
-                            {session.status !== 'idle' && (
-                                <p className="card-detail">Inicio: {getSessionTime()}</p>
-                            )}
-                        </div>
+                    <div className="btn-content">
+                        <Power size={32} />
+                        <span>{session.status === 'active' ? 'Gestionar' : 'Iniciar Turno'}</span>
                     </div>
-                    <div className="card-glow-effect shift-glow"></div>
-                </div>
+                </button>
 
-                {/* Card 2: History */}
-                <div
-                    className="menu-card history-card"
-                    onClick={() => onNavigate('history')}
-                >
-                    <div className="card-content">
-                        <div className="card-icon-wrapper history-icon">
-                            <History size={40} />
-                        </div>
-                        <div className="card-text">
-                            <h2>Historial</h2>
-                            <p className="card-detail">Ver turnos pasados</p>
-                        </div>
-                    </div>
-                    <div className="card-glow-effect history-glow"></div>
-                </div>
-
-                {/* Card 3: Statistics */}
-                <div
-                    className="menu-card stats-card"
+                {/* Button 2: Stats */}
+                <button
+                    className="grid-btn btn-stats"
                     onClick={() => onNavigate('stats')}
                 >
-                    <div className="card-content">
-                        <div className="card-icon-wrapper stats-icon">
-                            <BarChart2 size={40} />
-                        </div>
-                        <div className="card-text">
-                            <h2>Estadísticas</h2>
-                            <p className="card-detail">
-                                {metrics.milesDriven > 0
-                                    ? `${metrics.milesDriven.toFixed(1)} mi esta semana`
-                                    : 'Analizar rendimiento'}
-                            </p>
-                        </div>
+                    <div className="btn-content">
+                        <BarChart2 size={32} />
+                        <span>Estadísticas</span>
                     </div>
-                    <div className="card-glow-effect stats-glow"></div>
-                </div>
+                    {/* Decorative mini-chart bars could go here */}
+                </button>
 
-                {/* Card 4: Settings */}
-                <div
-                    className="menu-card settings-card"
+                {/* Button 3: History */}
+                <button
+                    className="grid-btn btn-history"
+                    onClick={() => onNavigate('history')}
+                >
+                    <div className="btn-content">
+                        <History size={32} />
+                        <span>Historial</span>
+                    </div>
+                </button>
+
+                {/* Button 4: Menu */}
+                <button
+                    className="grid-btn btn-menu"
                     onClick={() => onNavigate('settings')}
                 >
-                    <div className="card-content">
-                        <div className="card-icon-wrapper settings-icon">
-                            <Settings size={40} />
-                        </div>
-                        <div className="card-text">
-                            <h2>Configuración</h2>
-                            <p className="card-detail">Perfil y Preferencias</p>
-                        </div>
+                    <div className="btn-content">
+                        <Menu size={32} />
+                        <span>Menú</span>
                     </div>
-                    <div className="card-glow-effect settings-glow"></div>
-                </div>
+                </button>
             </div>
         </div>
     );
