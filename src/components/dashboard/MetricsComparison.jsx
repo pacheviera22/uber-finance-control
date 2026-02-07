@@ -1,417 +1,570 @@
 import React, { useState, useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { TrendingUp, TrendingDown, BarChart2, Calendar, DollarSign, Activity, Settings } from 'lucide-react';
+import { BarChart2, Calendar, Target, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 export default function MetricsComparison() {
     const { allTrips, metrics, session, t, config, dailyRecords, actions: { updateConfig, updateDailyRecord } } = useFinance();
 
-    // State for Config/Filters
-    const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'weekly'
+    // Date Selector State - BudgetBakers Style
+    const [selectorMode, setSelectorMode] = useState(1); // 0: periods, 1: presets, 2: custom range
+    const [periodType, setPeriodType] = useState('7d'); // For mode 0: 7d, 30d, 12w, 6m, 1y
+    const [presetType, setPresetType] = useState('day'); // For mode 1: day, week, month, year
+    const [presetOffset, setPresetOffset] = useState(0); // 0 = today/this week, -1 = yesterday/last week, etc
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd] = useState('');
+    const [showPresetDropdown, setShowPresetDropdown] = useState(false);
 
-    // Helper for Local Date (YYYY-MM-DD)
-    const getLocalDate = () => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const [selectedDate, setSelectedDate] = useState(getLocalDate());
-    const [selectedMetric, setSelectedMetric] = useState('earnings'); // 'earnings' | 'net' | 'miles' | 'expenses'
-
+    const [selectedMetric, setSelectedMetric] = useState('earnings');
     const [isEditingGas, setIsEditingGas] = useState(false);
 
-    // Derived Gas Price: Check Daily Record -> Fallback to Config
-    // Safe check if dailyRecords is loaded
-    const dailyPriceRecord = dailyRecords && dailyRecords[selectedDate];
-    const effectiveGasPrice = dailyPriceRecord ? dailyPriceRecord.gasPrice : config.gasPrice;
-
-    // Temp state for editing
-    const [tempGasPrice, setTempGasPrice] = useState(effectiveGasPrice);
-
-    // Sync temp price when selection changes (unless editing)
-    React.useEffect(() => {
-        if (!isEditingGas) {
-            setTempGasPrice(effectiveGasPrice);
-        }
-    }, [effectiveGasPrice, isEditingGas]);
-
-    // --- Helpers ---
     const getLocStr = (d) => {
         if (!d || isNaN(d.getTime())) return '';
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     };
 
-
-
-    const getStartEndTimestamps = (mode, dateStr) => {
-        const date = new Date(dateStr + 'T00:00:00'); // Local midnight
-
+    // Calculate date range based on selector mode
+    const getDateRange = () => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
         let start, end;
-        if (mode === 'daily') {
-            start = date.getTime();
-            end = start + 86400000; // +24h
+
+        if (selectorMode === 0) {
+            // Period mode: last X days/weeks/months
+            end = new Date(now.getTime() + 86400000);
+            switch (periodType) {
+                case '7d': start = new Date(now.getTime() - 6 * 86400000); break;
+                case '30d': start = new Date(now.getTime() - 29 * 86400000); break;
+                case '12w': start = new Date(now.getTime() - 83 * 86400000); break;
+                case '6m': start = new Date(now); start.setMonth(start.getMonth() - 6); break;
+                case '1y': start = new Date(now); start.setFullYear(start.getFullYear() - 1); break;
+                default: start = new Date(now.getTime() - 6 * 86400000);
+            }
+        } else if (selectorMode === 1) {
+            // Preset mode with offset
+            const baseDate = new Date(now);
+
+            if (presetType === 'day') {
+                baseDate.setDate(baseDate.getDate() + presetOffset);
+                start = new Date(baseDate);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(start.getTime() + 86400000);
+            } else if (presetType === 'week') {
+                const dayOfWeek = baseDate.getDay();
+                const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                baseDate.setDate(baseDate.getDate() + diff + (presetOffset * 7));
+                start = new Date(baseDate);
+                start.setHours(0, 0, 0, 0);
+                end = new Date(start.getTime() + 7 * 86400000);
+            } else if (presetType === 'month') {
+                baseDate.setMonth(baseDate.getMonth() + presetOffset);
+                start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+                end = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+            } else if (presetType === 'year') {
+                baseDate.setFullYear(baseDate.getFullYear() + presetOffset);
+                start = new Date(baseDate.getFullYear(), 0, 1);
+                end = new Date(baseDate.getFullYear() + 1, 0, 1);
+            }
         } else {
-            // Weekly: Start from Monday of the selected week
-            const day = date.getDay(); // 0 (Sun) - 6 (Sat)
-            const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-            const monday = new Date(date.setDate(diff));
-            monday.setHours(0, 0, 0, 0);
-            start = monday.getTime();
-            end = start + (7 * 86400000);
+            // Custom range mode
+            start = customStart ? new Date(customStart + 'T00:00:00') : new Date(now.getTime() - 6 * 86400000);
+            end = customEnd ? new Date(customEnd + 'T23:59:59') : new Date(now.getTime() + 86400000);
         }
-        return { start, end };
+
+        return { start: start.getTime(), end: end.getTime() };
     };
 
-    // --- Data Processing ---
-    const filteredData = useMemo(() => {
-        const { start, end } = getStartEndTimestamps(viewMode, selectedDate);
+    // Get display label for current selection
+    const getDateLabel = () => {
+        const now = new Date();
+        if (selectorMode === 0) {
+            const labels = { '7d': 'Últimos 7 días', '30d': 'Últimos 30 días', '12w': 'Últimas 12 semanas', '6m': 'Últimos 6 meses', '1y': 'Último año' };
+            return labels[periodType] || '';
+        } else if (selectorMode === 1) {
+            const baseDate = new Date(now);
+            if (presetType === 'day') {
+                baseDate.setDate(baseDate.getDate() + presetOffset);
+                if (presetOffset === 0) return 'Hoy';
+                if (presetOffset === -1) return 'Ayer';
+                return baseDate.toLocaleDateString('es', { day: 'numeric', month: 'short' });
+            } else if (presetType === 'week') {
+                if (presetOffset === 0) return 'Esta Semana';
+                if (presetOffset === -1) return 'Semana Pasada';
+                const dayOfWeek = baseDate.getDay();
+                const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                baseDate.setDate(baseDate.getDate() + diff + (presetOffset * 7));
+                const endDate = new Date(baseDate.getTime() + 6 * 86400000);
+                return `${baseDate.toLocaleDateString('es', { day: 'numeric', month: 'short' })} - ${endDate.toLocaleDateString('es', { day: 'numeric', month: 'short' })}`;
+            } else if (presetType === 'month') {
+                baseDate.setMonth(baseDate.getMonth() + presetOffset);
+                if (presetOffset === 0) return 'Este Mes';
+                return baseDate.toLocaleDateString('es', { month: 'long', year: 'numeric' });
+            } else if (presetType === 'year') {
+                baseDate.setFullYear(baseDate.getFullYear() + presetOffset);
+                if (presetOffset === 0) return 'Este Año';
+                return baseDate.getFullYear().toString();
+            }
+        } else {
+            if (!customStart || !customEnd) return 'Seleccionar rango';
+            return `${new Date(customStart).toLocaleDateString('es', { day: 'numeric', month: 'short' })} - ${new Date(customEnd).toLocaleDateString('es', { day: 'numeric', month: 'short' })}`;
+        }
+        return '';
+    };
 
-        // Filter trips in range
+    // Get effective gas price for a specific date - looks backward for inherited price
+    const getEffectiveGasPrice = (dateStr) => {
+        // First check if there's a direct record for this date
+        if (dailyRecords?.[dateStr]?.gasPrice) {
+            return dailyRecords[dateStr].gasPrice;
+        }
+
+        // Look backward through previous days to find the most recent price
+        const targetDate = new Date(dateStr + 'T00:00:00');
+        const allDates = Object.keys(dailyRecords || {})
+            .filter(d => dailyRecords[d]?.gasPrice)
+            .sort((a, b) => b.localeCompare(a)); // Sort descending (newest first)
+
+        for (const d of allDates) {
+            const recordDate = new Date(d + 'T00:00:00');
+            if (recordDate <= targetDate) {
+                return dailyRecords[d].gasPrice;
+            }
+        }
+
+        // No previous record found, use global config
+        return config.gasPrice;
+    };
+
+    // Get average gas price for a date range (for multi-day analysis periods)
+    const getAverageGasPriceForRange = (startTs, endTs) => {
+        const startDate = new Date(startTs);
+        const endDate = new Date(endTs);
+        const days = Math.ceil((endTs - startTs) / 86400000);
+
+        if (days <= 1) {
+            return getEffectiveGasPrice(getLocStr(startDate));
+        }
+
+        // Collect all unique prices in the range
+        const pricesInRange = [];
+        for (let i = 0; i < days; i++) {
+            const d = new Date(startTs + i * 86400000);
+            const dateStr = getLocStr(d);
+            if (dailyRecords?.[dateStr]?.gasPrice) {
+                pricesInRange.push(dailyRecords[dateStr].gasPrice);
+            }
+        }
+
+        // If multiple prices registered in this period, average them
+        if (pricesInRange.length > 1) {
+            return pricesInRange.reduce((a, b) => a + b, 0) / pricesInRange.length;
+        }
+
+        // Otherwise use the effective price at the start of the range
+        return getEffectiveGasPrice(getLocStr(startDate));
+    };
+
+    const currentPrice = useMemo(() => {
+        const { start: s, end: e } = getDateRange();
+        return getAverageGasPriceForRange(s, e);
+    }, [dailyRecords, config.gasPrice, selectorMode, periodType, presetType, presetOffset, customStart, customEnd]);
+
+    const effectiveGasPrice = currentPrice;
+    const [tempGasPrice, setTempGasPrice] = useState(effectiveGasPrice);
+
+    React.useEffect(() => {
+        if (!isEditingGas) setTempGasPrice(effectiveGasPrice);
+    }, [effectiveGasPrice, isEditingGas]);
+
+    const filteredData = useMemo(() => {
+        const { start, end } = getDateRange();
+
         const timeframeTrips = allTrips.filter(t => t.timestamp >= start && t.timestamp < end);
 
-        // Aggregate Defaults
-        let totalEarnings = 0;
-        let totalMiles = 0;
-        let totalExpenses = 0;
-
-        // Shared Time Vars
-        const todayStr = getLocStr(new Date());
+        let totalEarnings = 0, totalMiles = 0, totalExpenses = 0, productiveMiles = 0;
         const sessionDateStr = session.startTime ? getLocStr(new Date(session.startTime)) : null;
+        const selectedDateStr = getLocStr(new Date(start));
+        const matchesSessionContext = selectorMode === 1 && presetType === 'day' && session.startTime && selectedDateStr === sessionDateStr;
 
-        // Matches Session Context
-        // This covers Active sessions (Today) and Ended sessions (SessionDate)
-        // We define it here so it's available for both Chart Range and Gap Fill logic
-        const matchesSessionContext = viewMode === 'daily' && (selectedDate === todayStr || (session.startTime && selectedDate === sessionDateStr));
-
-        // Chart Data Struct
         const chartMap = {};
 
-        // Initialize Chart Labels
-        let rangeStart = 0;
-        let rangeEnd = 23;
+        // Determine chart granularity based on date range
+        const rangeDays = (end - start) / 86400000;
+        let chartMode = 'hour'; // hour, day, week, month
 
-        // Dynamic Range for Daily View
-        if (viewMode === 'daily') {
-            // matchesSessionContext is now available here
-
-            // Start with limits that force expansion
-            let minH = 24;
-            let maxH = -1;
-
-            // 1. Incorporate Session Times (if relevant to this date)
-            if (matchesSessionContext && session.startTime) {
-                const sH = new Date(session.startTime).getHours();
-                minH = Math.min(minH, sH);
-
-                if (session.endTime) {
-                    const eH = new Date(session.endTime).getHours();
-                    // Handle cross-midnight: if end hour < start hour, for THIS day we go to 23
-                    // For the NEXT day we start at 0 to endHour.
-                    // Complex. Simplified: If same day, use endHour. If cross, use 23.
-                    // We check if endTime > start + 24h? No.
-                    // Just check timestamp.
-                    const startTs = new Date(session.startTime).getTime();
-                    const endTs = new Date(session.endTime).getTime();
-                    const isSameDay = new Date(startTs).getDate() === new Date(endTs).getDate();
-
-                    if (isSameDay) {
-                        maxH = Math.max(maxH, eH);
-                    } else {
-                        // If selectedDate is Start Date, go to 23
-                        // If selectedDate is End Date, goes from 0 to eH (Handled by minH initialization? No)
-                        if (selectedDate === sessionDateStr) maxH = 23;
-                    }
-                } else {
-                    // Open ended session - maybe go to current hour?
-                    maxH = Math.max(maxH, new Date().getHours());
-                }
-            }
-
-            // 2. Incorporate Trips
-            timeframeTrips.forEach(t => {
-                const h = new Date(t.timestamp).getHours();
-                minH = Math.min(minH, h);
-                maxH = Math.max(maxH, h);
-            });
-
-            // 3. Fallback if no data
-            if (minH > maxH) {
-                // Default to 8am - 6pm if completely empty? Or 0-23?
-                // User said "hours defined in shift". If no shift...
-                minH = 8;
-                maxH = 18;
-            }
-
-            rangeStart = minH;
-            rangeEnd = maxH;
-
-            for (let i = rangeStart; i <= rangeEnd; i++) chartMap[i] = 0;
-        } else {
-            // Weekly
-            for (let i = 0; i < 7; i++) {
+        if (rangeDays <= 1) {
+            chartMode = 'hour';
+            for (let i = 0; i <= 23; i++) chartMap[i] = 0;
+        } else if (rangeDays <= 7) {
+            chartMode = 'day';
+            for (let i = 0; i < rangeDays; i++) {
                 const d = new Date(start + i * 86400000);
-                const k = d.toLocaleDateString(undefined, { weekday: 'short' });
-                chartMap[k] = 0;
+                chartMap[d.toLocaleDateString('es', { weekday: 'short' })] = 0;
             }
+        } else if (rangeDays <= 31) {
+            chartMode = 'day';
+            for (let i = 0; i < rangeDays; i++) {
+                const d = new Date(start + i * 86400000);
+                chartMap[d.getDate()] = 0;
+            }
+        } else {
+            chartMode = 'week';
+            const weeks = Math.ceil(rangeDays / 7);
+            for (let i = 0; i < weeks; i++) chartMap[`S${i + 1}`] = 0;
         }
 
-        // Process Trips
         timeframeTrips.forEach(trip => {
-            // Calc Financials
             const earnings = trip.amount || 0;
-            const dist = trip.distance || 0;
-            const miles = dist; // No Fallback, strict user input
-
-            // Look up gas price for THIS trip's day
+            const miles = trip.distance || 0;
             const tripDateKey = new Date(trip.timestamp).toISOString().split('T')[0];
-            const priceForDay = dailyRecords && dailyRecords[tripDateKey]
-                ? dailyRecords[tripDateKey].gasPrice
-                : config.gasPrice;
-
+            // Use inherited gas price for this specific day
+            const priceForDay = getEffectiveGasPrice(tripDateKey);
             const cost = (miles / config.vehicleMpg * priceForDay) + (miles * config.maintenanceCostPerMile);
             const net = earnings - cost;
-
             totalEarnings += earnings;
             totalMiles += miles;
+            productiveMiles += miles;
             totalExpenses += cost;
 
-            // Chart Aggregation
             let key;
             const tripDate = new Date(trip.timestamp);
-            if (viewMode === 'daily') {
+            if (chartMode === 'hour') {
                 key = tripDate.getHours();
+            } else if (chartMode === 'day' && rangeDays <= 7) {
+                key = tripDate.toLocaleDateString('es', { weekday: 'short' });
+            } else if (chartMode === 'day') {
+                key = tripDate.getDate();
             } else {
-                key = tripDate.toLocaleDateString(undefined, { weekday: 'short' });
+                const weekNum = Math.floor((trip.timestamp - start) / (7 * 86400000));
+                key = `S${weekNum + 1}`;
             }
 
-            // Add to chart based on selected metric
-            let valToAdd = 0;
-            if (selectedMetric === 'earnings') valToAdd = earnings;
-            if (selectedMetric === 'net') valToAdd = net;
-            if (selectedMetric === 'miles') valToAdd = miles;
-            if (selectedMetric === 'expenses') valToAdd = cost;
-
+            let valToAdd = selectedMetric === 'earnings' ? earnings : selectedMetric === 'net' ? net : selectedMetric === 'miles' ? miles : cost;
             if (chartMap[key] !== undefined) chartMap[key] += valToAdd;
         });
 
-        // Convert Chart Map to Array
-        const chartData = Object.entries(chartMap).map(([label, value]) => ({ label, value }));
-
-        // [FIX] Gap Fill: Include Session Miles (Deadhead/Unassigned) if viewing "Today"
-        // If the user's session is active or recently ended TODAY, metrics.milesDriven is the Authority.
-        // We compare metrics.milesDriven vs the sum of trip miles.
-
-        let finalTotalMiles = totalMiles;
-        let finalTotalExpenses = totalExpenses;
-
-        // Date Match Logic
-
-
-
-
-        // Trigger if viewing Today OR Session Date
-        // Reuse matchesSessionContext from above
-
+        let finalTotalMiles = totalMiles, finalTotalExpenses = totalExpenses;
         if (matchesSessionContext && metrics.milesDriven > totalMiles) {
             const unassignedMiles = metrics.milesDriven - totalMiles;
             finalTotalMiles += unassignedMiles;
-
-            // Calculate cost for unassigned miles
-            const dailyPrice = dailyRecords && dailyRecords[selectedDate]
-                ? dailyRecords[selectedDate].gasPrice
-                : config.gasPrice;
-
-            const unassignedCost = (unassignedMiles / config.vehicleMpg * dailyPrice) +
-                (unassignedMiles * config.maintenanceCostPerMile);
-
-            finalTotalExpenses += unassignedCost;
+            // Use inherited gas price for the selected date
+            const dailyPrice = getEffectiveGasPrice(selectedDateStr);
+            finalTotalExpenses += (unassignedMiles / config.vehicleMpg * dailyPrice) + (unassignedMiles * config.maintenanceCostPerMile);
         }
 
         return {
-            totalEarnings,
-            totalMiles: finalTotalMiles,
-            totalExpenses: finalTotalExpenses,
+            totalEarnings, totalMiles: finalTotalMiles, totalExpenses: finalTotalExpenses,
             totalNet: totalEarnings - finalTotalExpenses,
-            chartData,
-            tripCount: timeframeTrips.length
+            chartData: Object.entries(chartMap).map(([label, value]) => ({ label, value })),
+            tripCount: timeframeTrips.length,
+            productiveMiles
         };
-    }, [allTrips, viewMode, selectedDate, selectedMetric, config, dailyRecords, metrics.milesDriven, session.startTime]);
+    }, [allTrips, selectorMode, periodType, presetType, presetOffset, customStart, customEnd, selectedMetric, config, dailyRecords, metrics.milesDriven, session.startTime]);
 
-    // Format Helpers
-    const formatCurrency = (val) => `$${val.toFixed(0)}`;
-    const formatNet = (val) => `$${val.toFixed(2)}`;
-
-    // Handle Gas Price Update
     const handleGasUpdate = () => {
         const val = parseFloat(tempGasPrice);
         if (!isNaN(val)) {
-            // Save to Daily Record
-            updateDailyRecord(selectedDate, { gasPrice: val });
+            // Save to the start date of the current selection
+            const { start } = getDateRange();
+            const targetDate = getLocStr(new Date(start));
+            updateDailyRecord(targetDate, { gasPrice: val });
         }
         setIsEditingGas(false);
-    }
+    };
+
+    // Advanced Metrics Calculations
+    const { start: activeStart, end: activeEnd } = getDateRange();
+    const elapsedHours = session.startTime ? (Date.now() - session.startTime - (session.totalPausedTime || 0)) / 3600000 : 0;
+    const activeRangeDays = (activeEnd - activeStart) / 86400000;
+    const rangeHours = activeRangeDays <= 1 ? elapsedHours : activeRangeDays * 8; // Estimate 8 hours/day for multi-day
+    const netPerHour = rangeHours > 0 ? filteredData.totalNet / rangeHours : 0;
+    const grossPerHour = rangeHours > 0 ? filteredData.totalEarnings / rangeHours : 0;
+    const tripsPerHour = rangeHours > 0 ? filteredData.tripCount / rangeHours : 0;
+
+    const deadheadMiles = filteredData.totalMiles - filteredData.productiveMiles;
+    const deadheadPct = filteredData.totalMiles > 0 ? (deadheadMiles / filteredData.totalMiles) * 100 : 0;
+
+    const timeToEndMs = session.endTime ? session.endTime - Date.now() : 0;
+    const hoursRemaining = Math.max(0, timeToEndMs / 3600000);
+    const projectedTotal = filteredData.totalEarnings + (grossPerHour * hoursRemaining);
+    const projectedNet = filteredData.totalNet + (netPerHour * hoursRemaining);
+
+    const dailyGoal = metrics.meta || 250;
+    const goalProgress = Math.min((filteredData.totalEarnings / dailyGoal) * 100, 100);
+    const onTrack = projectedTotal >= dailyGoal;
+
+    const metricColors = {
+        earnings: { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', glow: 'rgba(102, 126, 234, 0.4)' },
+        net: { gradient: 'linear-gradient(135deg, #00D775 0%, #00B861 100%)', glow: 'rgba(0, 215, 117, 0.4)' },
+        expenses: { gradient: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', glow: 'rgba(239, 68, 68, 0.4)' },
+        miles: { gradient: 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)', glow: 'rgba(0, 210, 255, 0.4)' }
+    };
+
+    const maxVal = Math.max(...filteredData.chartData.map(o => o.value), 10);
 
     return (
-        <div className="card glass-card" style={{ padding: '0', overflow: 'hidden' }}>
-            {/* 1. Header & Filters */}
-            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.2)' }}>
-                {/* Top Row: Title + Toggle */}
-                <div className="flex-between" style={{ marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <BarChart2 size={16} color="var(--accent-color)" />
-                        ANÁLISIS (v2.0)
-                    </h3>
-                    <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '2px', display: 'flex' }}>
-                        <button
-                            onClick={() => setViewMode('daily')}
-                            style={{
-                                padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                                background: viewMode === 'daily' ? 'var(--accent-color)' : 'transparent',
-                                color: viewMode === 'daily' ? '#fff' : 'var(--text-muted)'
-                            }}
-                        >
-                            Día
-                        </button>
-                        <button
-                            onClick={() => setViewMode('weekly')}
-                            style={{
-                                padding: '6px 12px', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                                background: viewMode === 'weekly' ? 'var(--accent-color)' : 'transparent',
-                                color: viewMode === 'weekly' ? '#fff' : 'var(--text-muted)'
-                            }}
-                        >
-                            Semana
-                        </button>
+        <div style={{
+            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%)',
+            borderRadius: '24px', border: '1px solid rgba(255,255,255,0.08)',
+            overflow: 'hidden', marginBottom: '20px'
+        }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <BarChart2 size={20} color="white" />
+                        </div>
+                        <div>
+                            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Análisis Financiero</h3>
+                            <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', margin: 0 }}>{filteredData.tripCount} viajes</p>
+                        </div>
                     </div>
                 </div>
 
-                {/* Second Row: Date Picker + Legend */}
-                <div className="flex-between">
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <Calendar size={14} color="var(--text-muted)" />
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            style={{
-                                background: 'transparent', border: 'none', color: '#fff', fontSize: '12px', fontFamily: 'inherit', padding: 0, margin: 0, width: 'auto'
-                            }}
-                        />
-                    </div>
-                </div>
-            </div>
+                {/* === BudgetBakers Style Date Selector === */}
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '16px', padding: '16px' }}>
+                    {/* Main Display Bar with Navigation */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+                        <button onClick={() => {
+                            if (selectorMode === 0) {
+                                const periods = ['7d', '30d', '12w', '6m', '1y'];
+                                const idx = periods.indexOf(periodType);
+                                if (idx > 0) setPeriodType(periods[idx - 1]);
+                            } else if (selectorMode === 1) {
+                                setPresetOffset(presetOffset - 1);
+                            }
+                        }} style={{
+                            width: '36px', height: '36px', borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
+                        }}>
+                            <ChevronLeft size={20} />
+                        </button>
 
-            {/* 2. Key Metrics Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--border-color)' }}>
-                {['earnings', 'net', 'expenses', 'miles'].map(metric => {
-                    const isActive = selectedMetric === metric;
-                    let val = 0;
-                    let label = '';
-                    let color = '';
-
-                    if (metric === 'earnings') { val = filteredData.totalEarnings; label = 'Bruto'; color = '#fff'; }
-                    if (metric === 'net') { val = filteredData.totalNet; label = 'Neto'; color = '#00D775'; }
-                    if (metric === 'expenses') { val = filteredData.totalExpenses; label = 'Gastos'; color = '#ff4d4d'; }
-                    if (metric === 'miles') { val = filteredData.totalMiles; label = 'Millas'; color = '#00d2ff'; }
-
-                    return (
-                        <button
-                            key={metric}
-                            onClick={() => setSelectedMetric(metric)}
-                            style={{
-                                background: isActive ? 'rgba(255,255,255,0.08)' : 'var(--bg-card)',
-                                border: 'none', padding: '12px 4px', cursor: 'pointer', textAlign: 'center',
-                                borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
-                                transition: 'all 0.2s'
-                            }}
-                        >
-                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>{label}</div>
-                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: color }}>
-                                {metric === 'miles' ? val.toFixed(1) : `$${val.toFixed(0)}`}
+                        <div style={{ textAlign: 'center', flex: 1 }} onClick={() => selectorMode === 1 && setShowPresetDropdown(!showPresetDropdown)}>
+                            <div style={{ fontSize: '18px', fontWeight: '700', color: 'white', cursor: selectorMode === 1 ? 'pointer' : 'default' }}>
+                                {getDateLabel()}
                             </div>
+                        </div>
+
+                        <button onClick={() => {
+                            if (selectorMode === 0) {
+                                const periods = ['7d', '30d', '12w', '6m', '1y'];
+                                const idx = periods.indexOf(periodType);
+                                if (idx < periods.length - 1) setPeriodType(periods[idx + 1]);
+                            } else if (selectorMode === 1) {
+                                if (presetOffset < 0) setPresetOffset(presetOffset + 1);
+                            }
+                        }} disabled={selectorMode === 1 && presetOffset >= 0} style={{
+                            width: '36px', height: '36px', borderRadius: '50%',
+                            background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: selectorMode === 1 && presetOffset >= 0 ? 'rgba(255,255,255,0.2)' : 'white'
+                        }}>
+                            <ChevronRight size={20} />
                         </button>
-                    );
-                })}
+                    </div>
+
+                    {/* Preset Dropdown (Mode 1) */}
+                    {selectorMode === 1 && showPresetDropdown && (
+                        <div style={{
+                            background: 'rgba(0,0,0,0.4)', borderRadius: '12px', padding: '8px', marginBottom: '12px',
+                            display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px'
+                        }}>
+                            {[
+                                { key: 'day', label: 'Día' },
+                                { key: 'week', label: 'Semana' },
+                                { key: 'month', label: 'Mes' },
+                                { key: 'year', label: 'Año' }
+                            ].map(p => (
+                                <button key={p.key} onClick={() => { setPresetType(p.key); setPresetOffset(0); setShowPresetDropdown(false); }}
+                                    style={{
+                                        padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                                        background: presetType === p.key ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.1)',
+                                        color: 'white', fontSize: '12px', fontWeight: '600'
+                                    }}>
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Period Options (Mode 0) */}
+                    {selectorMode === 0 && (
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                            {[
+                                { key: '7d', label: '7D' },
+                                { key: '30d', label: '30D' },
+                                { key: '12w', label: '12S' },
+                                { key: '6m', label: '6M' },
+                                { key: '1y', label: '1A' }
+                            ].map(p => (
+                                <button key={p.key} onClick={() => setPeriodType(p.key)}
+                                    style={{
+                                        padding: '8px 14px', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                                        background: periodType === p.key ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.1)',
+                                        color: 'white', fontSize: '12px', fontWeight: '600'
+                                    }}>
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Custom Range (Mode 2) */}
+                    {selectorMode === 2 && (
+                        <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '4px' }}>Desde</label>
+                                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '13px' }}
+                                />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', display: 'block', marginBottom: '4px' }}>Hasta</label>
+                                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', color: 'white', fontSize: '13px' }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Mode Selector Pills */}
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                        {[0, 1, 2].map(mode => (
+                            <button key={mode} onClick={() => setSelectorMode(mode)}
+                                style={{
+                                    width: selectorMode === mode ? '24px' : '10px',
+                                    height: '10px', borderRadius: '5px', border: 'none', cursor: 'pointer',
+                                    background: selectorMode === mode ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255,255,255,0.2)',
+                                    transition: 'all 0.3s ease'
+                                }}
+                            />
+                        ))}
+                    </div>
+                </div>
             </div>
 
-            {/* 3. Main Chart */}
-            <div style={{ padding: '20px', minHeight: '250px' }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginBottom: '16px', textAlign: 'center' }}>
-                    {viewMode === 'daily' ? `Por Hora (${selectedMetric})` : `Por Día (${selectedMetric})`}
+            {/* KPI Cards - Show only for daily view */}
+            {selectorMode === 1 && presetType === 'day' && (
+                <div style={{ padding: '20px', background: 'rgba(0,0,0,0.15)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <Target size={14} color="#00D775" /> Progreso hacia meta
+                            </span>
+                            <span style={{ fontSize: '14px', fontWeight: '700', color: onTrack ? '#00D775' : '#F59E0B' }}>
+                                ${filteredData.totalEarnings.toFixed(0)} / ${dailyGoal}
+                            </span>
+                        </div>
+                        <div style={{ height: '10px', background: 'rgba(0,0,0,0.4)', borderRadius: '5px', overflow: 'hidden' }}>
+                            <div style={{
+                                width: `${goalProgress}%`, height: '100%',
+                                background: onTrack ? 'linear-gradient(90deg, #00D775 0%, #00FF88 100%)' : 'linear-gradient(90deg, #F59E0B 0%, #FBBF24 100%)',
+                                borderRadius: '5px', transition: 'width 0.5s ease'
+                            }} />
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                        <div style={{ background: 'linear-gradient(145deg, rgba(0, 215, 117, 0.15), rgba(0, 184, 97, 0.05))', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(0, 215, 117, 0.2)' }}>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>$/Hr Neto</div>
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: netPerHour > 20 ? '#00D775' : netPerHour > 15 ? '#F59E0B' : '#EF4444' }}>${netPerHour.toFixed(2)}</div>
+                        </div>
+                        <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Viajes/Hr</div>
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>{tripsPerHour.toFixed(1)}</div>
+                        </div>
+                        <div style={{ background: deadheadPct > 30 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '14px', textAlign: 'center', border: deadheadPct > 30 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Millas Vacías</div>
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: deadheadPct > 30 ? '#EF4444' : '#00D775' }}>{deadheadPct.toFixed(0)}%</div>
+                        </div>
+                        <div style={{ background: 'linear-gradient(145deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.05))', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(102, 126, 234, 0.2)' }}>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Proyección</div>
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: '#667eea' }}>${projectedTotal.toFixed(0)}</div>
+                        </div>
+                    </div>
                 </div>
+            )}
 
-                <div className="chart-container" style={{ height: '200px' }}>
+            {/* Metric Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', padding: '20px' }}>
+                {[
+                    { key: 'earnings', label: 'Bruto', value: filteredData.totalEarnings, format: v => `$${v.toFixed(0)}` },
+                    { key: 'net', label: 'Neto', value: filteredData.totalNet, format: v => `$${v.toFixed(0)}` },
+                    { key: 'expenses', label: 'Gastos', value: filteredData.totalExpenses, format: v => `$${v.toFixed(0)}` },
+                    { key: 'miles', label: 'Millas', value: filteredData.totalMiles, format: v => v.toFixed(1) }
+                ].map(m => (
+                    <button key={m.key} onClick={() => setSelectedMetric(m.key)} style={{
+                        background: selectedMetric === m.key ? metricColors[m.key].gradient : 'rgba(0,0,0,0.25)',
+                        border: selectedMetric === m.key ? 'none' : '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '16px', padding: '16px 12px', cursor: 'pointer', textAlign: 'center',
+                        boxShadow: selectedMetric === m.key ? `0 8px 24px ${metricColors[m.key].glow}` : 'none',
+                        transform: selectedMetric === m.key ? 'scale(1.02)' : 'scale(1)', transition: 'all 0.3s ease'
+                    }}>
+                        <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: selectedMetric === m.key ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.5)', marginBottom: '6px' }}>{m.label}</div>
+                        <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>{m.format(m.value)}</div>
+                    </button>
+                ))}
+            </div>
+
+            {/* Chart */}
+            <div style={{ padding: '0 24px 24px' }}>
+                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    Distribución
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '140px', paddingBottom: '25px', position: 'relative' }}>
                     {filteredData.chartData.length > 0 ? filteredData.chartData.map((d, i) => {
-                        const maxVal = Math.max(...filteredData.chartData.map(o => o.value), 10);
                         const heightPct = (d.value / maxVal) * 100;
-
                         return (
-                            <div key={i} className="bar-group">
-                                <div className="bar-wrapper">
-                                    {d.value > 0 && (
-                                        <div style={{
-                                            position: 'absolute', bottom: `${Math.max(heightPct, 5)}%`, marginBottom: '8px',
-                                            fontSize: '9px', fontWeight: 'bold', color: '#fff', textShadow: '0 0 4px rgba(0,0,0,0.8)'
-                                        }}>
-                                            {selectedMetric === 'miles' ? d.value.toFixed(0) : `$${d.value.toFixed(0)}`}
-                                        </div>
-                                    )}
-                                    <div className="bar-3d" style={{
-                                        height: `${Math.max(heightPct, 2)}%`,
-                                        background: selectedMetric === 'expenses' ? 'linear-gradient(to top, #800000, #ff4d4d)' :
-                                            selectedMetric === 'net' ? 'linear-gradient(to top, #004d29, #00D775)' : undefined
-                                    }}>
-                                        <div className="bar-top" style={{ background: '#fff' }}></div>
+                            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                                {d.value > 0 && (
+                                    <div style={{ fontSize: '9px', fontWeight: '700', color: 'rgba(255,255,255,0.8)', marginBottom: '4px' }}>
+                                        {selectedMetric === 'miles' ? d.value.toFixed(0) : `$${d.value.toFixed(0)}`}
                                     </div>
+                                )}
+                                <div style={{
+                                    width: '100%', maxWidth: '32px',
+                                    height: `${Math.max(heightPct, 3)}%`,
+                                    background: metricColors[selectedMetric].gradient,
+                                    borderRadius: '6px 6px 2px 2px',
+                                    boxShadow: `0 4px 12px ${metricColors[selectedMetric].glow}`,
+                                    transition: 'height 0.4s ease', position: 'relative'
+                                }}>
+                                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '30%', background: 'linear-gradient(to bottom, rgba(255,255,255,0.3), transparent)', borderRadius: '6px 6px 0 0' }} />
                                 </div>
-                                <span className="bar-label" style={{ fontSize: '9px' }}>{d.label}</span>
+                                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', marginTop: '6px', position: 'absolute', bottom: 0 }}>{d.label}</span>
                             </div>
                         );
                     }) : (
-                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', width: '100%', fontStyle: 'italic' }}>
+                        <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.3)', width: '100%', fontStyle: 'italic', fontSize: '14px' }}>
                             Sin datos para este periodo
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* 4. Edit Config Quick Access (DAILY OVERRIDE) */}
-            <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Precio Gas ({dailyPriceRecord ? 'Diario' : 'Global'}):
-                </span>
-                <div style={{ display: 'flex', gap: '12px', fontSize: '11px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ color: '#ff4d4d' }}>$</span>
-                        {isEditingGas ? (
-                            <input
-                                type="number"
-                                value={tempGasPrice ?? effectiveGasPrice ?? 0}
-                                onChange={e => setTempGasPrice(e.target.value)}
-                                onBlur={handleGasUpdate}
-                                onKeyDown={e => { if (e.key === 'Enter') handleGasUpdate(); }}
-                                style={{ width: '45px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: '4px', padding: '2px' }}
-                                autoFocus
-                            />
-                        ) : (
-                            <div
-                                onClick={() => { setIsEditingGas(true); setTempGasPrice(effectiveGasPrice); }}
-                                style={{
-                                    cursor: 'pointer', borderBottom: '1px dashed #666', fontWeight: 'bold',
-                                    color: dailyPriceRecord ? 'var(--accent-color)' : '#fff'
-                                }}
-                            >
-                                {effectiveGasPrice?.toFixed(2)}
-                            </div>
-                        )}
-                    </div>
+            {/* Gas Price Footer */}
+            <div style={{ padding: '16px 24px', background: 'rgba(0,0,0,0.3)', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)' }}>Precio Gas</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ color: '#EF4444', fontWeight: '600' }}>$</span>
+                    {isEditingGas ? (
+                        <input type="number" value={tempGasPrice ?? effectiveGasPrice ?? 0}
+                            onChange={e => setTempGasPrice(e.target.value)}
+                            onBlur={handleGasUpdate}
+                            onKeyDown={e => { if (e.key === 'Enter') handleGasUpdate(); }}
+                            style={{ width: '60px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '8px', padding: '6px 10px', fontSize: '14px' }}
+                            autoFocus
+                        />
+                    ) : (
+                        <div onClick={() => { setIsEditingGas(true); setTempGasPrice(effectiveGasPrice); }}
+                            style={{ cursor: 'pointer', borderBottom: '1px dashed rgba(255,255,255,0.3)', fontWeight: '700', fontSize: '16px', color: '#fff' }}>
+                            {effectiveGasPrice?.toFixed(2)}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div >
+        </div>
     );
 }
