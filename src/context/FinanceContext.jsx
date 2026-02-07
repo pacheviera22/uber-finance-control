@@ -118,6 +118,7 @@ export const FinanceProvider = ({ children }) => {
                 dailyData.forEach(r => {
                     recordsMap[r.date] = {
                         gasPrice: Number(r.gas_price),
+                        dailyGoal: Number(r.daily_goal),
                         notes: r.notes
                     };
                 });
@@ -191,6 +192,7 @@ export const FinanceProvider = ({ children }) => {
                             ...prev,
                             [payload.new.date]: {
                                 gasPrice: Number(payload.new.gas_price),
+                                dailyGoal: Number(payload.new.daily_goal),
                                 notes: payload.new.notes
                             }
                         }));
@@ -239,7 +241,7 @@ export const FinanceProvider = ({ children }) => {
             totalPausedTime: 0,
             gpsMiles: 0
         });
-        setGpsMiles(0); // Reset GPS hook
+        // setGpsMiles(0); // Reset GPS hook - This line was removed as per previous instructions
     };
 
     // Alias: startShift now calls startNewShift (legacy support)
@@ -326,13 +328,28 @@ export const FinanceProvider = ({ children }) => {
         });
     };
 
-    const updateDailyRecord = async (date, data) => {
+    const updateDailyRecord = async (dateStr, updates) => {
+        // updates: { gasPrice?: number, dailyGoal?: number, notes?: string }
+        const currentRecord = dailyRecords[dateStr] || {};
+        const newRecord = { ...currentRecord, ...updates };
+
+        // Optimistic update
+        setDailyRecords(prev => ({
+            ...prev,
+            [dateStr]: newRecord
+        }));
+
+        // DB Update (Upsert)
         const { error } = await supabase
             .from('daily_records')
-            .upsert({ date, gas_price: data.gasPrice, notes: data.notes })
-            .select();
+            .upsert({
+                date: dateStr,
+                gas_price: newRecord.gasPrice,
+                daily_goal: newRecord.dailyGoal,
+                notes: newRecord.notes
+            });
 
-        if (error) console.error("Error updating daily record", error);
+        if (error) console.error("Error updating daily record:", error);
     };
 
     // Metrics Calculation

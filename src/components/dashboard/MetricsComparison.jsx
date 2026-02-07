@@ -334,7 +334,18 @@ export default function MetricsComparison() {
         showProjection = false; // Don't show "Projection", show "Total"
     }
 
-    const dailyGoal = metrics.meta || 250;
+    // Get Daily Goal for the specific date
+    // 1. Check if there's a record in dailyRecords for the selected date (historical or today override)
+    // 2. Fallback to current session meta (if viewing today/active)
+    // 3. Fallback to default 250
+    const selectedDateKey = getLocStr(new Date(activeStart));
+    const historicalGoal = dailyRecords?.[selectedDateKey]?.dailyGoal;
+
+    const dailyGoal = historicalGoal || metrics.meta || 250;
+
+    // If viewing today, we might want to sync the goal back if it changed? 
+    // Actually, let's trust the logic: specific day record > session default
+
     const goalProgress = Math.min((filteredData.totalEarnings / dailyGoal) * 100, 100);
     const onTrack = isViewingActiveSession ? (projectedTotal >= dailyGoal) : (filteredData.totalEarnings >= dailyGoal);
 
