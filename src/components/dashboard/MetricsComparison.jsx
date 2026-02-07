@@ -39,6 +39,7 @@ export default function MetricsComparison() {
 
     // --- Helpers ---
     const getLocStr = (d) => {
+        if (!d || isNaN(d.getTime())) return '';
         const year = d.getFullYear();
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const day = String(d.getDate()).padStart(2, '0');
@@ -202,22 +203,12 @@ export default function MetricsComparison() {
         let finalTotalExpenses = totalExpenses;
 
         // Date Match Logic
-        const getLocStr = (d) => {
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
 
-        const todayStr = getLocStr(new Date());
-        let sessionDateStr = null;
-        if (session.startTime) {
-            sessionDateStr = getLocStr(new Date(session.startTime));
-        }
+
+
 
         // Trigger if viewing Today OR Session Date
-        // This covers Active sessions (Today) and Ended sessions (SessionDate)
-        const matchesSessionContext = viewMode === 'daily' && (selectedDate === todayStr || selectedDate === sessionDateStr);
+        // Reuse matchesSessionContext from above
 
         if (matchesSessionContext && metrics.milesDriven > totalMiles) {
             const unassignedMiles = metrics.milesDriven - totalMiles;
