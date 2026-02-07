@@ -3,7 +3,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { TrendingUp, Clock, Edit2, Check } from 'lucide-react';
 
 export default function Header() {
-    const { metrics, session, t, toggleLanguage, language, config, actions } = useFinance();
+    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal } = useFinance();
 
     // Safe defaults
     const goal = session.meta || 100;
@@ -22,7 +22,7 @@ export default function Header() {
     const handleSaveGoal = () => {
         const val = parseFloat(tempGoal);
         if (!isNaN(val) && val > 0) {
-            actions.updateConfig('weeklyGoal', val);
+            updateWeeklyGoal(val);
         }
         setIsEditingGoal(false);
     };
