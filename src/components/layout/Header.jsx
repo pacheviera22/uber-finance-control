@@ -1,14 +1,31 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
-import { TrendingUp, Clock } from 'lucide-react';
+import { TrendingUp, Clock, Edit2, Check } from 'lucide-react';
 
 export default function Header() {
-    const { metrics, session, t, toggleLanguage, language } = useFinance();
+    const { metrics, session, t, toggleLanguage, language, config, actions } = useFinance();
 
     // Safe defaults
     const goal = session.meta || 100;
     const current = metrics.totalEarnings || 0;
     const progress = Math.min((current / goal) * 100, 100);
+
+    // Edit Weekly Goal State
+    const [isEditingGoal, setIsEditingGoal] = useState(false);
+    const [tempGoal, setTempGoal] = useState(metrics.weeklyGoal);
+
+    // Sync temp goal when metrics change (unless editing)
+    useEffect(() => {
+        if (!isEditingGoal) setTempGoal(metrics.weeklyGoal);
+    }, [metrics.weeklyGoal, isEditingGoal]);
+
+    const handleSaveGoal = () => {
+        const val = parseFloat(tempGoal);
+        if (!isNaN(val) && val > 0) {
+            actions.updateConfig('weeklyGoal', val);
+        }
+        setIsEditingGoal(false);
+    };
 
     return (
         <header className="card glass-card" style={{ marginBottom: '16px', padding: '16px' }}>
@@ -68,9 +85,43 @@ export default function Header() {
             <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                 <div className="flex-between" style={{ marginBottom: '4px' }}>
                     <span className="text-muted" style={{ fontSize: '10px', textTransform: 'uppercase' }}>{t.weeklyProgress}</span>
-                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        ${metrics.weeklyEarnings.toFixed(0)} / ${metrics.weeklyGoal}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            ${metrics.weeklyEarnings.toFixed(0)} /
+                        </span>
+
+                        {isEditingGoal ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <input
+                                    type="number"
+                                    value={tempGoal}
+                                    onChange={(e) => setTempGoal(e.target.value)}
+                                    style={{
+                                        width: '60px',
+                                        background: '#000',
+                                        border: '1px solid var(--accent-color)',
+                                        color: '#fff',
+                                        borderRadius: '4px',
+                                        padding: '2px 4px',
+                                        fontSize: '12px'
+                                    }}
+                                    autoFocus
+                                />
+                                <button onClick={handleSaveGoal} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#00D775' }}>
+                                    <Check size={14} />
+                                </button>
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                    ${metrics.weeklyGoal}
+                                </span>
+                                <button onClick={() => setIsEditingGoal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5 }}>
+                                    <Edit2 size={12} color="#fff" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div style={{
                     height: '4px',
@@ -80,7 +131,7 @@ export default function Header() {
                 }}>
                     <div style={{
                         height: '100%',
-                        width: `${Math.min(100, (metrics.weeklyEarnings / metrics.weeklyGoal) * 100)}%`,
+                        width: `${Math.min(100, (metrics.weeklyEarnings / (isEditingGoal ? tempGoal : metrics.weeklyGoal)) * 100)}%`,
                         background: '#0078D7', // Blue for Weekly to differentiate
                         boxShadow: '0 0 5px rgba(0, 120, 215, 0.5)',
                         transition: 'width 0.5s ease-out'
