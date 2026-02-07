@@ -273,24 +273,70 @@ export default function MetricsComparison() {
 
     // Advanced Metrics Calculations
     const { start: activeStart, end: activeEnd } = getDateRange();
-    const elapsedHours = session.startTime ? (Date.now() - session.startTime - (session.totalPausedTime || 0)) / 3600000 : 0;
-    const activeRangeDays = (activeEnd - activeStart) / 86400000;
-    const rangeHours = activeRangeDays <= 1 ? elapsedHours : activeRangeDays * 8; // Estimate 8 hours/day for multi-day
-    const netPerHour = rangeHours > 0 ? filteredData.totalNet / rangeHours : 0;
-    const grossPerHour = rangeHours > 0 ? filteredData.totalEarnings / rangeHours : 0;
-    const tripsPerHour = rangeHours > 0 ? filteredData.tripCount / rangeHours : 0;
+
+    // Determine if we are viewing "Today" or the active session
+    const todayStr = getLocStr(new Date());
+    const sessionDateStr = session.startTime ? getLocStr(new Date(session.startTime)) : null;
+    const isViewingActiveSession = (selectorMode === 1 && presetType === 'day' && presetOffset === 0) ||
+        (selectorMode === 1 && presetType === 'day' && session.startTime && getLocStr(new Date(activeStart)) === sessionDateStr);
+
+    let workedHours = 0;
+
+    if (isViewingActiveSession && session.startTime) {
+        // Live tracking for active session
+        workedHours = (Date.now() - session.startTime - (session.totalPausedTime || 0)) / 3600000;
+    } else {
+        // Historical / Closed periods: Estimate based on trip timestamps
+        if (filteredData.tripCount > 0) {
+            // Sort trips to find first and last
+            const sortedTrips = [...allTrips].filter(t => t.timestamp >= activeStart && t.timestamp < activeEnd).sort((a, b) => a.timestamp - b.timestamp);
+            if (sortedTrips.length > 0) {
+                const firstTrip = sortedTrips[0].timestamp;
+                const lastTrip = sortedTrips[sortedTrips.length - 1].timestamp;
+                // Add 1 hour buffer for "prep/cleanup" or just raw diff. Using raw diff + average trip time buffer
+                // Ensure at least 1 hour if only 1 trip
+                workedHours = Math.max((lastTrip - firstTrip) / 3600000, 1);
+            }
+        }
+    }
+
+    // Ensure no division by zero
+    workedHours = Math.max(workedHours, 0.1);
+
+    const netPerHour = workedHours > 0 ? filteredData.totalNet / workedHours : 0;
+    const tripsPerHour = workedHours > 0 ? filteredData.tripCount / workedHours : 0;
 
     const deadheadMiles = filteredData.totalMiles - filteredData.productiveMiles;
     const deadheadPct = filteredData.totalMiles > 0 ? (deadheadMiles / filteredData.totalMiles) * 100 : 0;
 
-    const timeToEndMs = session.endTime ? session.endTime - Date.now() : 0;
-    const hoursRemaining = Math.max(0, timeToEndMs / 3600000);
-    const projectedTotal = filteredData.totalEarnings + (grossPerHour * hoursRemaining);
-    const projectedNet = filteredData.totalNet + (netPerHour * hoursRemaining);
+    // Projections only make sense for ACTIVE session
+    let projectedTotal = 0;
+    let projectedNet = 0;
+    let showProjection = false;
+
+    if (isViewingActiveSession && session.startTime && !session.endTime) {
+        // Active session projection
+        const timeToEndMs = session.endTime ? session.endTime - Date.now() : 0;
+        const targetHours = 8; // Assumed target shift length if not set? Or use goal
+        // Simple projection: Current Rate * Remaining Time (if set) OR Current Rate * Standard 8h Shift
+
+        // Let's project based on "Pace to Goal" if available, or simple extrapolation
+        const elapsed = (Date.now() - session.startTime) / 3600000;
+        if (elapsed > 0) {
+            const pace = filteredData.totalEarnings / elapsed;
+            // Project to 8 hours or goal
+            projectedTotal = pace * 8; // Project to 8 hour shift
+            showProjection = true;
+        }
+    } else {
+        // Past dates: Projection is just the Actual Total
+        projectedTotal = filteredData.totalEarnings;
+        showProjection = false; // Don't show "Projection", show "Total"
+    }
 
     const dailyGoal = metrics.meta || 250;
     const goalProgress = Math.min((filteredData.totalEarnings / dailyGoal) * 100, 100);
-    const onTrack = projectedTotal >= dailyGoal;
+    const onTrack = isViewingActiveSession ? (projectedTotal >= dailyGoal) : (filteredData.totalEarnings >= dailyGoal);
 
     const metricColors = {
         earnings: { gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', glow: 'rgba(102, 126, 234, 0.4)' },
@@ -298,6 +344,13 @@ export default function MetricsComparison() {
         expenses: { gradient: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)', glow: 'rgba(239, 68, 68, 0.4)' },
         miles: { gradient: 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)', glow: 'rgba(0, 210, 255, 0.4)' }
     };
+
+    const advancedMetrics = [
+        { label: '$/HR NETO', value: netPerHour, format: v => `$${v.toFixed(2)}`, color: netPerHour >= 20 ? '#00D775' : netPerHour >= 15 ? '#F59E0B' : '#EF4444' },
+        { label: 'VIAJES/HR', value: tripsPerHour, format: v => v.toFixed(1), color: '#fff' },
+        { label: 'MILLAS VACÍAS', value: deadheadPct, format: v => `${v.toFixed(0)}%`, color: deadheadPct < 10 ? '#00D775' : deadheadPct < 25 ? '#F59E0B' : '#EF4444' },
+        { label: showProjection ? 'PROYECCIÓN' : 'TOTAL', value: projectedTotal, format: v => `$${v.toFixed(0)}`, color: '#667eea' }
+    ];
 
     const maxVal = Math.max(...filteredData.chartData.map(o => o.value), 10);
 
