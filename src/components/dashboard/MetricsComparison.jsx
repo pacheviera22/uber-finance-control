@@ -79,6 +79,15 @@ export default function MetricsComparison() {
         let totalMiles = 0;
         let totalExpenses = 0;
 
+        // Shared Time Vars
+        const todayStr = getLocStr(new Date());
+        const sessionDateStr = session.startTime ? getLocStr(new Date(session.startTime)) : null;
+
+        // Matches Session Context
+        // This covers Active sessions (Today) and Ended sessions (SessionDate)
+        // We define it here so it's available for both Chart Range and Gap Fill logic
+        const matchesSessionContext = viewMode === 'daily' && (selectedDate === todayStr || (session.startTime && selectedDate === sessionDateStr));
+
         // Chart Data Struct
         const chartMap = {};
 
@@ -88,9 +97,7 @@ export default function MetricsComparison() {
 
         // Dynamic Range for Daily View
         if (viewMode === 'daily') {
-            const todayStr = getLocStr(new Date());
-            const sessionDateStr = session.startTime ? getLocStr(new Date(session.startTime)) : null;
-            const matchesSessionContext = selectedDate === todayStr || (session.startTime && selectedDate === sessionDateStr);
+            // matchesSessionContext is now available here
 
             // Start with limits that force expansion
             let minH = 24;
