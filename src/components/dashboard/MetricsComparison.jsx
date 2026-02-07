@@ -38,6 +38,15 @@ export default function MetricsComparison() {
     }, [effectiveGasPrice, isEditingGas]);
 
     // --- Helpers ---
+    const getLocStr = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+
+
     const getStartEndTimestamps = (mode, dateStr) => {
         const date = new Date(dateStr + 'T00:00:00'); // Local midnight
 
@@ -73,8 +82,67 @@ export default function MetricsComparison() {
         const chartMap = {};
 
         // Initialize Chart Labels
+        let rangeStart = 0;
+        let rangeEnd = 23;
+
+        // Dynamic Range for Daily View
         if (viewMode === 'daily') {
-            for (let i = 0; i < 24; i++) chartMap[i] = 0;
+            const todayStr = getLocStr(new Date());
+            const sessionDateStr = session.startTime ? getLocStr(new Date(session.startTime)) : null;
+            const matchesSessionContext = selectedDate === todayStr || (session.startTime && selectedDate === sessionDateStr);
+
+            // Start with limits that force expansion
+            let minH = 24;
+            let maxH = -1;
+
+            // 1. Incorporate Session Times (if relevant to this date)
+            if (matchesSessionContext && session.startTime) {
+                const sH = new Date(session.startTime).getHours();
+                minH = Math.min(minH, sH);
+
+                if (session.endTime) {
+                    const eH = new Date(session.endTime).getHours();
+                    // Handle cross-midnight: if end hour < start hour, for THIS day we go to 23
+                    // For the NEXT day we start at 0 to endHour.
+                    // Complex. Simplified: If same day, use endHour. If cross, use 23.
+                    // We check if endTime > start + 24h? No.
+                    // Just check timestamp.
+                    const startTs = new Date(session.startTime).getTime();
+                    const endTs = new Date(session.endTime).getTime();
+                    const isSameDay = new Date(startTs).getDate() === new Date(endTs).getDate();
+
+                    if (isSameDay) {
+                        maxH = Math.max(maxH, eH);
+                    } else {
+                        // If selectedDate is Start Date, go to 23
+                        // If selectedDate is End Date, goes from 0 to eH (Handled by minH initialization? No)
+                        if (selectedDate === sessionDateStr) maxH = 23;
+                    }
+                } else {
+                    // Open ended session - maybe go to current hour?
+                    maxH = Math.max(maxH, new Date().getHours());
+                }
+            }
+
+            // 2. Incorporate Trips
+            timeframeTrips.forEach(t => {
+                const h = new Date(t.timestamp).getHours();
+                minH = Math.min(minH, h);
+                maxH = Math.max(maxH, h);
+            });
+
+            // 3. Fallback if no data
+            if (minH > maxH) {
+                // Default to 8am - 6pm if completely empty? Or 0-23?
+                // User said "hours defined in shift". If no shift...
+                minH = 8;
+                maxH = 18;
+            }
+
+            rangeStart = minH;
+            rangeEnd = maxH;
+
+            for (let i = rangeStart; i <= rangeEnd; i++) chartMap[i] = 0;
         } else {
             // Weekly
             for (let i = 0; i < 7; i++) {
