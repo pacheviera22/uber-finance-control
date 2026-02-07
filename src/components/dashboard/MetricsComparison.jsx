@@ -7,7 +7,17 @@ export default function MetricsComparison() {
 
     // State for Config/Filters
     const [viewMode, setViewMode] = useState('daily'); // 'daily' | 'weekly'
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+
+    // Helper for Local Date (YYYY-MM-DD)
+    const getLocalDate = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState(getLocalDate());
     const [selectedMetric, setSelectedMetric] = useState('earnings'); // 'earnings' | 'net' | 'miles' | 'expenses'
 
     const [isEditingGas, setIsEditingGas] = useState(false);
@@ -79,7 +89,7 @@ export default function MetricsComparison() {
             // Calc Financials
             const earnings = trip.amount || 0;
             const dist = trip.distance || 0;
-            const miles = dist > 0 ? dist : 5; // Fallback
+            const miles = dist; // No Fallback, strict user input
 
             // Look up gas price for THIS trip's day
             const tripDateKey = new Date(trip.timestamp).toISOString().split('T')[0];
@@ -116,15 +126,55 @@ export default function MetricsComparison() {
         // Convert Chart Map to Array
         const chartData = Object.entries(chartMap).map(([label, value]) => ({ label, value }));
 
+        // [FIX] Gap Fill: Include Session Miles (Deadhead/Unassigned) if viewing "Today"
+        // If the user's session is active or recently ended TODAY, metrics.milesDriven is the Authority.
+        // We compare metrics.milesDriven vs the sum of trip miles.
+
+        let finalTotalMiles = totalMiles;
+        let finalTotalExpenses = totalExpenses;
+
+        // Date Match Logic
+        const getLocStr = (d) => {
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const todayStr = getLocStr(new Date());
+        let sessionDateStr = null;
+        if (session.startTime) {
+            sessionDateStr = getLocStr(new Date(session.startTime));
+        }
+
+        // Trigger if viewing Today OR Session Date
+        // This covers Active sessions (Today) and Ended sessions (SessionDate)
+        const matchesSessionContext = viewMode === 'daily' && (selectedDate === todayStr || selectedDate === sessionDateStr);
+
+        if (matchesSessionContext && metrics.milesDriven > totalMiles) {
+            const unassignedMiles = metrics.milesDriven - totalMiles;
+            finalTotalMiles += unassignedMiles;
+
+            // Calculate cost for unassigned miles
+            const dailyPrice = dailyRecords && dailyRecords[selectedDate]
+                ? dailyRecords[selectedDate].gasPrice
+                : config.gasPrice;
+
+            const unassignedCost = (unassignedMiles / config.vehicleMpg * dailyPrice) +
+                (unassignedMiles * config.maintenanceCostPerMile);
+
+            finalTotalExpenses += unassignedCost;
+        }
+
         return {
             totalEarnings,
-            totalMiles,
-            totalExpenses,
-            totalNet: totalEarnings - totalExpenses,
+            totalMiles: finalTotalMiles,
+            totalExpenses: finalTotalExpenses,
+            totalNet: totalEarnings - finalTotalExpenses,
             chartData,
             tripCount: timeframeTrips.length
         };
-    }, [allTrips, viewMode, selectedDate, selectedMetric, config, dailyRecords]);
+    }, [allTrips, viewMode, selectedDate, selectedMetric, config, dailyRecords, metrics.milesDriven, session.startTime]);
 
     // Format Helpers
     const formatCurrency = (val) => `$${val.toFixed(0)}`;
@@ -148,7 +198,7 @@ export default function MetricsComparison() {
                 <div className="flex-between" style={{ marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <BarChart2 size={16} color="var(--accent-color)" />
-                        ANÁLISIS
+                        ANÁLISIS (v2.0)
                     </h3>
                     <div style={{ background: 'rgba(255,255,255,0.1)', borderRadius: '8px', padding: '2px', display: 'flex' }}>
                         <button
@@ -296,6 +346,6 @@ export default function MetricsComparison() {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

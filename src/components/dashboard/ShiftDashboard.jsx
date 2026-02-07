@@ -67,22 +67,7 @@ export default function ShiftDashboard({ onBack }) {
                             value={metrics.milesDriven.toFixed(1)}
                             subtext={
                                 <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                    {(metrics.usingGPS || metrics.isGpsActive || metrics.gpsError) && (
-                                        <span style={{
-                                            width: '8px',
-                                            height: '8px',
-                                            borderRadius: '50%',
-                                            background: metrics.gpsError ? '#FF4D4D' : (metrics.usingGPS ? '#00D775' : '#FFA500'),
-                                            boxShadow: `0 0 5px ${metrics.gpsError ? '#FF4D4D' : (metrics.usingGPS ? '#00D775' : '#FFA500')}`
-                                        }} />
-                                    )}
-                                    {metrics.gpsError
-                                        ? `Err: ${metrics.gpsError}`
-                                        : metrics.usingGPS
-                                            ? 'GPS Tracking'
-                                            : metrics.isGpsActive
-                                                ? 'GPS Ready'
-                                                : `${t.odo}: ${metrics.lastOdometer}`}
+                                    {`${t.odo}: ${metrics.lastOdometer}`}
                                 </span>
                             }
                         />

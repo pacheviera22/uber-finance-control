@@ -76,7 +76,8 @@ export default function TripForm({ onClose, initialData = null }) {
                         amount: formData.amount,
                         odometer: formData.odometer,
                         timestamp: formData.timestamp,
-                        platform: formData.platform
+                        platform: formData.platform,
+                        distance: formData.distance
                     });
                 }
                 onClose();

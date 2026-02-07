@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useGPS } from '../hooks/useGPS';
 import { supabase } from '../supabaseClient';
 import { translations } from '../utils/translations';
 
@@ -18,7 +17,8 @@ export const FinanceProvider = ({ children }) => {
         return {
             gasPrice: parseFloat(localStorage.getItem('uber_gas_price')) || 3.10,
             vehicleMpg: parseFloat(localStorage.getItem('uber_vehicle_mpg')) || 24,
-            maintenanceCostPerMile: 0.30
+            maintenanceCostPerMile: 0.30,
+            isGpsEnabled: localStorage.getItem('uber_gps_enabled') !== 'false' // Default true
         };
     });
 
@@ -27,6 +27,7 @@ export const FinanceProvider = ({ children }) => {
             const updated = { ...prev, ...newConfig };
             if (newConfig.gasPrice) localStorage.setItem('uber_gas_price', newConfig.gasPrice);
             if (newConfig.vehicleMpg) localStorage.setItem('uber_vehicle_mpg', newConfig.vehicleMpg);
+            if (newConfig.isGpsEnabled !== undefined) localStorage.setItem('uber_gps_enabled', newConfig.isGpsEnabled);
             return updated;
         });
     };
@@ -203,69 +204,7 @@ export const FinanceProvider = ({ children }) => {
         };
     }, []);
 
-    // Integra GPS Hook
-    const { gpsMiles: liveGpsMiles, setGpsMiles, currentSpeed, location, error: gpsError } = useGPS(session.status === 'active');
-
-    // Sync Live GPS to Session State & Cloud (Throttled?)
-    useEffect(() => {
-        if (liveGpsMiles > 0) {
-            // Update local session state to include new miles
-            // But be careful not to infinite loop or override. 
-            // Actually, we should accumulate.
-            // Simplified: Just add liveGpsMiles to the base "gpsMiles" loaded from DB is tricky.
-            // Better: 'liveGpsMiles' in hook resets to 0 on mount.
-            // We need to capture the delta and add it to session.gpsMiles.
-        }
-    }, [liveGpsMiles]);
-
-    // Better Approach for MVP:
-    // The Hook tracks "Miles since mount". We verify "base miles" from session.
-    // Actually, let's just make the hook handle the "active" state and we periodically save to DB.
-
-    // Let's implement a simple saver interval
-    useEffect(() => {
-        if (session.status === 'active' && liveGpsMiles > 0) {
-            const timer = setTimeout(() => {
-                // We need to commit 'liveGpsMiles' to the DB and reset the hook's counter? 
-                // Or just treat session.gpsMiles as the Source of Truth and have the hook notify increments.
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [liveGpsMiles, session.status]);
-
-    // Alternative: Let's pass the current session.gpsMiles to the hook? No.
-    // Let's manually handle the update logic here.
-
-    // When liveGpsMiles changes, we update the session ONLY if it's significant change to avoid DB spam
-    // For MVP: Let's trust 'milesDriven' calculation for now and just ADD a 'gpsSupported' flag
-    // wait, the goal IS to use GPS.
-
-    // New Strategy:
-    // 1. We keep 'session.gpsMiles' in DB.
-    // 2. We add 'liveGpsMiles' (from hook) to it for display.
-    // 3. We save to DB periodically.
-
-    // Actually, simply updating the 'milesDriven' calculation is what we want.
-    // milesDriven = MAX( (Odo - InitOdo), session.gpsMiles + liveGpsMiles )
-
-    const [unsavedGpsMiles, setUnsavedGpsMiles] = useState(0);
-
-    useEffect(() => {
-        setUnsavedGpsMiles(liveGpsMiles);
-    }, [liveGpsMiles]);
-
-    // Periodic Save (every 30s or on pause)
-    useEffect(() => {
-        if (unsavedGpsMiles > 0.1) {
-            const interval = setInterval(() => {
-                const newTotal = (session.gpsMiles || 0) + unsavedGpsMiles;
-                updateSessionInCloud({ gpsMiles: newTotal });
-                setGpsMiles(0); // Reset hook
-                setUnsavedGpsMiles(0);
-            }, 10000);
-            return () => clearInterval(interval);
-        }
-    }, [unsavedGpsMiles]);
+    // GPS logic removed per user request. Relying on Odometer.
 
 
     // Actions (Write to Supabase)
@@ -408,16 +347,7 @@ export const FinanceProvider = ({ children }) => {
         : session.initialOdometer;
 
     // Safety check for NaN
-    // Hybrid Miles Calculation: Use GPS if available and > Odometer, else Odometer
-    const odoMiles = Math.max(0, (lastOdometer || 0) - (session.initialOdometer || 0));
-    const totalGpsMiles = (session.gpsMiles || 0) + (unsavedGpsMiles || 0);
-
-    // We prefer GPS if it has data (> 0.1), otherwise fallback to odometer
-    // This allows the user to switch between modes seamlessly.
-    // If they forget to set start odometer, GPS saves them.
-    // If GPS fails, they can fix end odometer.
-    const milesDriven = totalGpsMiles > odoMiles ? totalGpsMiles : odoMiles;
-    // Safety check for NaN
+    const milesDriven = Math.max(0, (lastOdometer || 0) - (session.initialOdometer || 0));
 
     const metaRestante = Math.max(0, (session.meta || 0) - totalEarnings);
 
@@ -493,10 +423,7 @@ export const FinanceProvider = ({ children }) => {
                 weeklyGoal,
                 totalOperatingCost,
                 totalNetProfit,
-                currentSpeed,
-                usingGPS: totalGpsMiles > 0.1,
-                isGpsActive: !!location && !gpsError,
-                gpsError
+                currentSpeed: 0 // No GPS
             },
             updateWeeklyGoal
         }}>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { FinanceProvider } from './context/FinanceContext';
+import { FinanceProvider, useFinance } from './context/FinanceContext';
+import { MapPin, ToggleRight, ToggleLeft } from 'lucide-react';
 import HomeMenu from './components/dashboard/HomeMenu';
 import ShiftDashboard from './components/dashboard/ShiftDashboard';
 import HistoryModal from './components/dashboard/HistoryModal';
@@ -35,6 +36,7 @@ class ErrorBoundary extends React.Component {
 }
 
 function AppContent() {
+  const { config, actions } = useFinance();
   const [currentView, setCurrentView] = useState('home'); // 'home', 'dashboard', 'history', 'stats', 'settings'
 
   const handleNavigate = (view) => {
@@ -73,7 +75,10 @@ function AppContent() {
         <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
           <button onClick={() => setCurrentView('home')} style={{ marginBottom: 20, background: 'none', border: 'none', color: 'white', fontSize: 20 }}>← Volver</button>
           <h1>Configuración</h1>
-          <p>Próximamente...</p>
+          <p>Opciones simplificadas.</p>
+          <div style={{ marginTop: '30px', textAlign: 'center', opacity: 0.5, fontSize: '12px' }}>
+            Driver Pro v1.2.1 (Odometer Only)
+          </div>
         </div>
       )}
     </>
