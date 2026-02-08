@@ -334,6 +334,7 @@ export default function MetricsComparison() {
         showProjection = false; // Don't show "Projection", show "Total"
     }
 
+
     // Get Daily Goal for the specific date
     // 1. Check if there's a record in dailyRecords for the selected date (historical or today override)
     // 2. Fallback to current session meta (if viewing today/active)
@@ -341,7 +342,27 @@ export default function MetricsComparison() {
     const selectedDateKey = getLocStr(new Date(activeStart));
     const historicalGoal = dailyRecords?.[selectedDateKey]?.dailyGoal;
 
-    const dailyGoal = historicalGoal || metrics.meta || 250;
+    // Logic: If viewing active session (Today), PRIORITY is session.meta (Active Goal)
+    // If viewing history, PRIORITY is historicalGoal (Saved Record)
+    let dailyGoal = 250;
+
+    if (isViewingActiveSession) {
+        dailyGoal = session.meta || 250;
+    } else {
+        dailyGoal = historicalGoal || 250;
+    }
+
+    // Sync Active Goal to Daily Record if needed (Side Effect)
+    React.useEffect(() => {
+        if (isViewingActiveSession && session.meta && selectedDateKey && updateDailyRecord) {
+            // Check if we need to update the DB record for today
+            // If historicalGoal is missing or different, update it
+            if (historicalGoal !== session.meta) {
+                // console.log("Syncing daily goal...", session.meta);
+                updateDailyRecord(selectedDateKey, { dailyGoal: session.meta });
+            }
+        }
+    }, [isViewingActiveSession, session.meta, selectedDateKey, historicalGoal, updateDailyRecord]);
 
     // If viewing today, we might want to sync the goal back if it changed? 
     // Actually, let's trust the logic: specific day record > session default
