@@ -68,60 +68,64 @@ export const FinanceProvider = ({ children }) => {
             setLoading(true);
 
             // 1. Parallel Fetching (Avoid Waterfall)
-            const [sessionRes, tripsRes, dailyRes] = await Promise.all([
-                supabase.from('sessions').select('*').eq('id', 1).single(),
-                supabase.from('trips').select('*').order('timestamp', { ascending: true }),
-                supabase.from('daily_records').select('*')
-            ]);
+            try {
+                const [sessionRes, tripsRes, dailyRes] = await Promise.all([
+                    supabase.from('sessions').select('*').eq('id', 1).single(),
+                    supabase.from('trips').select('*').order('timestamp', { ascending: true }),
+                    supabase.from('daily_records').select('*')
+                ]);
 
-            const { data: sessionData, error: sessionError } = sessionRes;
-            const { data: tripsData } = tripsRes;
-            const { data: dailyData } = dailyRes;
+                const { data: sessionData, error: sessionError } = sessionRes;
+                const { data: tripsData } = tripsRes;
+                const { data: dailyData } = dailyRes;
 
-            // Process Session
-            if (sessionData) {
-                // Map snake_case to camelCase
-                setSession({
-                    status: sessionData.status,
-                    meta: Number(sessionData.meta),
-                    initialOdometer: Number(sessionData.initial_odometer),
-                    startTime: sessionData.start_time,
-                    endTime: sessionData.end_time,
-                    lastPauseTime: sessionData.last_pause_time,
-                    totalPausedTime: sessionData.total_paused_time,
-                    gpsMiles: Number(sessionData.gps_miles || 0)
-                });
-            } else if (sessionError && sessionError.code === 'PGRST116') {
-                console.warn("Session row not found. Did you run the SQL script?");
+                // Process Session
+                if (sessionData) {
+                    // Map snake_case to camelCase
+                    setSession({
+                        status: sessionData.status,
+                        meta: Number(sessionData.meta),
+                        initialOdometer: Number(sessionData.initial_odometer),
+                        startTime: sessionData.start_time,
+                        endTime: sessionData.end_time,
+                        lastPauseTime: sessionData.last_pause_time,
+                        totalPausedTime: sessionData.total_paused_time,
+                        gpsMiles: Number(sessionData.gps_miles || 0)
+                    });
+                } else if (sessionError && sessionError.code === 'PGRST116') {
+                    console.warn("Session row not found. Did you run the SQL script?");
+                }
+
+                // Process Trips
+                if (tripsData) {
+                    setTrips(tripsData.map(t => ({
+                        ...t,
+                        amount: Number(t.amount),
+                        odometer: Number(t.odometer),
+                        timestamp: Number(t.timestamp),
+                        distance: Number(t.distance || 0),
+                        gasPrice: Number(t.gas_price || 0), // from DB snake_case
+                        mpg: Number(t.mpg || 24)
+                    })));
+                }
+
+                // Process Daily Records
+                if (dailyData) {
+                    const recordsMap = {};
+                    dailyData.forEach(r => {
+                        recordsMap[r.date] = {
+                            gasPrice: Number(r.gas_price),
+                            dailyGoal: Number(r.daily_goal),
+                            notes: r.notes
+                        };
+                    });
+                    setDailyRecords(recordsMap);
+                }
+            } catch (error) {
+                console.error("Critical Error loading initial data:", error);
+            } finally {
+                setLoading(false);
             }
-
-            // Process Trips
-            if (tripsData) {
-                setTrips(tripsData.map(t => ({
-                    ...t,
-                    amount: Number(t.amount),
-                    odometer: Number(t.odometer),
-                    timestamp: Number(t.timestamp),
-                    distance: Number(t.distance || 0),
-                    gasPrice: Number(t.gas_price || 0), // from DB snake_case
-                    mpg: Number(t.mpg || 24)
-                })));
-            }
-
-            // Process Daily Records
-            if (dailyData) {
-                const recordsMap = {};
-                dailyData.forEach(r => {
-                    recordsMap[r.date] = {
-                        gasPrice: Number(r.gas_price),
-                        dailyGoal: Number(r.daily_goal),
-                        notes: r.notes
-                    };
-                });
-                setDailyRecords(recordsMap);
-            }
-
-            setLoading(false);
         };
 
         loadDat();
@@ -348,6 +352,16 @@ export const FinanceProvider = ({ children }) => {
         if (error) console.error("Error updating daily record:", error);
     };
 
+    // Weekly Goal (Local Storage)
+    const [weeklyGoal, setWeeklyGoal] = useState(() => {
+        return parseFloat(localStorage.getItem('uber_weekly_goal')) || 1000;
+    });
+
+    const updateWeeklyGoal = (amount) => {
+        setWeeklyGoal(amount);
+        localStorage.setItem('uber_weekly_goal', amount);
+    };
+
     // Memoize Actions to prevent re-creation
     const actions = React.useMemo(() => ({
         startShift,
@@ -362,9 +376,19 @@ export const FinanceProvider = ({ children }) => {
         updateEndTime,
         updateConfig,
         updateDailyRecord
-    }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile]); // Dependencies for actions? mostly they use refs or current state... actually better to keep them stable if possible, but they use 'session' in closure... 
+    }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile, dailyRecords]); // Dependencies for actions? mostly they use refs or current state... actually better to keep them stable if possible, but they use 'session' in closure... 
     // Ideally actions should use functional updates or refs to be truly stable, but for now memoizing them with dependencies is better than nothing.
     // Actually, many use 'session' directly. 
+
+    // Helper for weekly calculations - Moved here to be accessible
+    const getWeekRange = () => {
+        const now = new Date();
+        const day = now.getDay(); // 0 is Sunday
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const monday = new Date(now.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        return monday.getTime();
+    };
 
     // Memoize Metrics Calculation
     const metrics = React.useMemo(() => {
