@@ -67,13 +67,18 @@ export const FinanceProvider = ({ children }) => {
         const loadDat = async () => {
             setLoading(true);
 
-            // 1. Get Session (ID=1)
-            const { data: sessionData, error: sessionError } = await supabase
-                .from('sessions')
-                .select('*')
-                .eq('id', 1)
-                .single();
+            // 1. Parallel Fetching (Avoid Waterfall)
+            const [sessionRes, tripsRes, dailyRes] = await Promise.all([
+                supabase.from('sessions').select('*').eq('id', 1).single(),
+                supabase.from('trips').select('*').order('timestamp', { ascending: true }),
+                supabase.from('daily_records').select('*')
+            ]);
 
+            const { data: sessionData, error: sessionError } = sessionRes;
+            const { data: tripsData } = tripsRes;
+            const { data: dailyData } = dailyRes;
+
+            // Process Session
             if (sessionData) {
                 // Map snake_case to camelCase
                 setSession({
@@ -90,12 +95,7 @@ export const FinanceProvider = ({ children }) => {
                 console.warn("Session row not found. Did you run the SQL script?");
             }
 
-            // 2. Get Trips
-            const { data: tripsData } = await supabase
-                .from('trips')
-                .select('*')
-                .order('timestamp', { ascending: true });
-
+            // Process Trips
             if (tripsData) {
                 setTrips(tripsData.map(t => ({
                     ...t,
@@ -108,11 +108,7 @@ export const FinanceProvider = ({ children }) => {
                 })));
             }
 
-            // 3. Get Daily Records
-            const { data: dailyData } = await supabase
-                .from('daily_records')
-                .select('*');
-
+            // Process Daily Records
             if (dailyData) {
                 const recordsMap = {};
                 dailyData.forEach(r => {
@@ -352,98 +348,95 @@ export const FinanceProvider = ({ children }) => {
         if (error) console.error("Error updating daily record:", error);
     };
 
-    // Metrics Calculation
-    const currentTrips = session.startTime
-        ? trips.filter(t => t.timestamp >= session.startTime) // Filter in memory for MVP
-        : [];
+    // Memoize Actions to prevent re-creation
+    const actions = React.useMemo(() => ({
+        startShift,
+        pauseShift,
+        resumeShift,
+        endShift,
+        addTrip,
+        updateTrip,
+        deleteTrip,
+        updateStartTime,
+        updateStartOdometer,
+        updateEndTime,
+        updateConfig,
+        updateDailyRecord
+    }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile]); // Dependencies for actions? mostly they use refs or current state... actually better to keep them stable if possible, but they use 'session' in closure... 
+    // Ideally actions should use functional updates or refs to be truly stable, but for now memoizing them with dependencies is better than nothing.
+    // Actually, many use 'session' directly. 
 
-    const totalEarnings = currentTrips.reduce((sum, t) => sum + t.amount, 0);
+    // Memoize Metrics Calculation
+    const metrics = React.useMemo(() => {
+        const currentTrips = session.startTime
+            ? trips.filter(t => t.timestamp >= session.startTime)
+            : [];
 
-    const lastOdometer = currentTrips.length > 0
-        ? currentTrips[currentTrips.length - 1].odometer
-        : session.initialOdometer;
+        const totalEarnings = currentTrips.reduce((sum, t) => sum + t.amount, 0);
 
-    // Safety check for NaN
-    const milesDriven = Math.max(0, (lastOdometer || 0) - (session.initialOdometer || 0));
+        const lastOdometer = currentTrips.length > 0
+            ? currentTrips[currentTrips.length - 1].odometer
+            : session.initialOdometer;
 
-    const metaRestante = Math.max(0, (session.meta || 0) - totalEarnings);
+        const milesDriven = Math.max(0, (lastOdometer || 0) - (session.initialOdometer || 0));
+        const metaRestante = Math.max(0, (session.meta || 0) - totalEarnings);
 
-    // Profitability Metrics (Current Session)
-    // Refactored: Use Session Miles (Odometer Diff) for total cost
-    const totalOperatingCost = (
-        (milesDriven / config.vehicleMpg * config.gasPrice) +
-        (milesDriven * config.maintenanceCostPerMile)
-    );
+        const totalOperatingCost = (
+            (milesDriven / config.vehicleMpg * config.gasPrice) +
+            (milesDriven * config.maintenanceCostPerMile)
+        );
 
-    const totalNetProfit = totalEarnings - totalOperatingCost;
+        const totalNetProfit = totalEarnings - totalOperatingCost;
 
-    // Weekly Goal (Local Storage)
-    const [weeklyGoal, setWeeklyGoal] = useState(() => {
-        return parseFloat(localStorage.getItem('uber_weekly_goal')) || 1000;
-    });
+        const weekStart = getWeekRange();
+        const weeklyEarnings = trips
+            .filter(t => t.timestamp >= weekStart)
+            .reduce((sum, t) => sum + t.amount, 0);
 
-    const updateWeeklyGoal = (amount) => {
-        setWeeklyGoal(amount);
-        localStorage.setItem('uber_weekly_goal', amount);
-    };
+        return {
+            totalEarnings,
+            milesDriven,
+            metaRestante,
+            lastOdometer,
+            weeklyEarnings,
+            weeklyGoal,
+            totalOperatingCost,
+            totalNetProfit,
+            currentSpeed: 0
+        };
+    }, [session.startTime, session.initialOdometer, session.meta, trips, config.vehicleMpg, config.gasPrice, config.maintenanceCostPerMile, weeklyGoal]);
 
-    if (loading) {
-        return <div style={{ color: 'white', padding: '20px', textAlign: 'center' }}>Syncing with cloud...</div>;
-    }
-
-    // Weekly Calculations
-    const getWeekRange = () => {
-        const now = new Date();
-        const day = now.getDay(); // 0 is Sunday
-        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-        const monday = new Date(now.setDate(diff));
-        monday.setHours(0, 0, 0, 0);
-        return monday.getTime();
-    };
-
-    const startOfWeek = getWeekRange();
-    const weeklyEarnings = trips
-        .filter(t => t.timestamp >= startOfWeek)
-        .reduce((sum, t) => sum + t.amount, 0);
+    // Memoize Context Value
+    const value = React.useMemo(() => ({
+        language,
+        toggleLanguage,
+        t,
+        config,
+        updateConfig,
+        session,
+        trips: session.startTime ? trips.filter(t => t.timestamp >= session.startTime) : [],
+        allTrips: trips,
+        dailyRecords,
+        actions: {
+            startShift,
+            pauseShift,
+            resumeShift,
+            endShift,
+            addTrip,
+            updateTrip,
+            deleteTrip,
+            updateStartTime,
+            updateStartOdometer,
+            updateEndTime,
+            updateConfig,
+            updateDailyRecord
+        },
+        metrics,
+        updateWeeklyGoal
+    }), [language, config, session, trips, dailyRecords, metrics, weeklyGoal]); // Dependencies
 
     return (
-        <FinanceContext.Provider value={{
-            language,
-            toggleLanguage,
-            t,
-            config,
-            updateConfig,
-            session,
-            trips: currentTrips,
-            allTrips: trips,
-            dailyRecords,
-            actions: {
-                startShift,
-                pauseShift,
-                resumeShift,
-                endShift,
-                addTrip,
-                updateTrip,
-                deleteTrip,
-                updateStartTime,
-                updateStartOdometer,
-                updateEndTime,
-                updateConfig,
-                updateDailyRecord
-            },
-            metrics: {
-                totalEarnings,
-                milesDriven,
-                metaRestante,
-                lastOdometer,
-                weeklyEarnings,
-                weeklyGoal,
-                totalOperatingCost,
-                totalNetProfit,
-                currentSpeed: 0 // No GPS
-            },
-            updateWeeklyGoal
-        }}>
+        <FinanceContext.Provider value={value}>
             {children}
         </FinanceContext.Provider >
     );

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { Trash2, Banknote, Car } from 'lucide-react';
 
@@ -6,7 +6,9 @@ export default function TripList() {
     const { trips, actions, t, config } = useFinance();
 
     // Reverse sort to show newest first
-    const sortedTrips = [...trips].sort((a, b) => b.timestamp - a.timestamp);
+    const sortedTrips = useMemo(() => {
+        return [...trips].sort((a, b) => b.timestamp - a.timestamp);
+    }, [trips]);
 
     if (sortedTrips.length === 0) {
         return (
