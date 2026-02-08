@@ -193,7 +193,26 @@ export default function MetricsComparison() {
 
         if (rangeDays <= 1) {
             chartMode = 'hour';
-            for (let i = 0; i <= 23; i++) chartMap[i] = 0;
+            // Dynamic Range Calculation
+            const relevantHours = timeframeTrips.map(t => new Date(t.timestamp).getHours());
+
+            if (matchesSessionContext && session.startTime) {
+                relevantHours.push(new Date(session.startTime).getHours());
+                relevantHours.push(new Date().getHours());
+            }
+
+            if (relevantHours.length > 0) {
+                const minH = Math.max(0, Math.min(...relevantHours) - 1); // Start 1 hour early
+                const maxH = Math.min(23, Math.max(...relevantHours) + 1); // End 1 hour late
+
+                for (let i = minH; i <= maxH; i++) chartMap[i] = 0;
+            } else {
+                // If no data and no session, we can defaults to 0-23 OR show "No Data" (empty map)
+                // Let's show standard business hours 6-22 as a nice empty state? 
+                // Or just empty to trigger "Sin datos" message which is cleaner.
+                // Leaving empty.
+            }
+
         } else if (rangeDays <= 7) {
             chartMode = 'day';
             for (let i = 0; i < rangeDays; i++) {

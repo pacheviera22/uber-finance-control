@@ -1,0 +1,35 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.18 [39m[90m/Users/yosvanypachecoviera/Documents/Antigravity/Seguimiento laboral[39m
+
+ [31m❯[39m src/tests/SystemIntegrity.test.jsx [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 139[2mms[22m[39m
+[31m     [31m×[31m should render the main application without crashing[39m[32m 138[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/tests/SystemIntegrity.test.jsx[2m > [22mSystem Integrity Smoke Test[2m > [22mshould render the main application without crashing
+[31m[1mTypeError[22m: __vite_ssr_import_2__.supabase.channel(...).on(...).on(...).on is not a function[39m
+[36m [2m❯[22m src/context/FinanceContext.jsx:[2m186:14[22m[39m
+    [90m184| [39m                }
+    [90m185| [39m            )
+    [90m186| [39m            [33m.[39m[34mon[39m(
+    [90m   | [39m             [31m^[39m
+    [90m187| [39m                [32m'postgres_changes'[39m[33m,[39m
+    [90m188| [39m                { event: '*', schema: 'public', table: 'daily_records'…
+[90m [2m❯[22m Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:[2m25989:20[22m[39m
+[90m [2m❯[22m runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:[2m874:13[22m[39m
+[90m [2m❯[22m commitHookEffectListMount node_modules/react-dom/cjs/react-dom-client.development.js:[2m13249:29[22m[39m
+[90m [2m❯[22m commitHookPassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:[2m13336:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:[2m15484:13[22m[39m
+[90m [2m❯[22m recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:[2m15439:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:[2m15476:11[22m[39m
+[90m [2m❯[22m recursivelyTraversePassiveMountEffects node_modules/react-dom/cjs/react-dom-client.development.js:[2m15439:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber node_modules/react-dom/cjs/react-dom-client.development.js:[2m15519:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 23:24:56
+[2m   Duration [22m 902ms[2m (transform 144ms, setup 51ms, import 248ms, tests 139ms, environment 381ms)[22m
+
