@@ -74,11 +74,10 @@ export default function HomeMenu({ onNavigate }) {
     const netEarnings = metrics.totalEarnings - gasCost - maintCost;
 
     return (
-        <div style={{
+        <div className="home-container" style={{
             minHeight: '100vh',
-            background: 'linear-gradient(180deg, #0A0F1C 0%, #111827 50%, #0F172A 100%)',
-            padding: '40px 24px',
-            color: 'white',
+            padding: 'var(--spacing-lg)',
+            color: 'var(--text-primary)',
             position: 'relative',
             overflow: 'hidden'
         }}>
@@ -90,25 +89,25 @@ export default function HomeMenu({ onNavigate }) {
                 />
             )}
 
-            {/* Background Decoration */}
+            {/* Background Decoration (Subtle Lime Glows) */}
             <div style={{
-                position: 'absolute', top: '-200px', right: '-200px',
-                width: '500px', height: '500px', borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(0, 215, 117, 0.08) 0%, transparent 70%)',
-                pointerEvents: 'none'
+                position: 'absolute', top: '-20%', right: '-10%',
+                width: '600px', height: '600px', borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(0, 230, 118, 0.08) 0%, transparent 70%)',
+                pointerEvents: 'none', zIndex: 0
             }} />
             <div style={{
-                position: 'absolute', bottom: '-150px', left: '-150px',
-                width: '400px', height: '400px', borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%)',
-                pointerEvents: 'none'
+                position: 'absolute', bottom: '-10%', left: '-10%',
+                width: '500px', height: '500px', borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(0, 230, 118, 0.05) 0%, transparent 70%)',
+                pointerEvents: 'none', zIndex: 0
             }} />
 
             {/* Header */}
             <header style={{ marginBottom: '32px', position: 'relative', zIndex: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                        <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>
+                        <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                             {time.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
                         </p>
                         <h1 style={{ fontSize: '32px', fontWeight: '700', margin: 0, letterSpacing: '-0.5px' }}>
@@ -116,7 +115,7 @@ export default function HomeMenu({ onNavigate }) {
                         </h1>
                         <p style={{
                             fontSize: '14px',
-                            color: '#00D775',
+                            color: 'var(--accent-color)',
                             fontWeight: '600',
                             letterSpacing: '2px',
                             textTransform: 'uppercase',
@@ -135,76 +134,80 @@ export default function HomeMenu({ onNavigate }) {
                 </div>
             </header>
 
-            {/* Hero Status Card */}
+            {/* Hero Status Card (Cyber-Financial Style) */}
             <div
                 onClick={() => onNavigate('dashboard')}
+                className="card"
                 style={{
                     background: isActive
-                        ? 'linear-gradient(135deg, rgba(0, 215, 117, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%)'
-                        : 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
-                    borderRadius: '24px',
-                    padding: '28px',
-                    marginBottom: '24px',
-                    border: isActive ? '1px solid rgba(0, 215, 117, 0.3)' : '1px solid rgba(255,255,255,0.08)',
+                        ? 'linear-gradient(135deg, rgba(18, 31, 25, 0.9) 0%, rgba(0, 230, 118, 0.05) 100%)'
+                        : 'var(--bg-card)',
+                    border: isActive ? '1px solid var(--accent-color)' : '1px solid var(--border-color)',
                     cursor: 'pointer',
                     position: 'relative',
                     overflow: 'hidden',
-                    transition: 'transform 0.2s, box-shadow 0.2s',
-                    boxShadow: isActive ? '0 0 40px rgba(0, 215, 117, 0.1)' : 'none'
+                    transition: 'all 0.3s ease',
+                    boxShadow: isActive ? '0 0 30px rgba(0, 230, 118, 0.1)' : '0 10px 30px rgba(0,0,0,0.3)'
                 }}
             >
                 {isActive && (
                     <div style={{
-                        position: 'absolute', top: '16px', right: '16px',
+                        position: 'absolute', top: '24px', right: '24px',
                         display: 'flex', alignItems: 'center', gap: '8px',
-                        background: 'rgba(0, 215, 117, 0.2)', padding: '6px 12px', borderRadius: '20px'
+                        background: 'rgba(0, 230, 118, 0.15)', padding: '6px 12px', borderRadius: '20px',
+                        border: '1px solid rgba(0, 230, 118, 0.3)'
                     }}>
                         <div style={{
                             width: '8px', height: '8px', borderRadius: '50%',
-                            background: '#00D775',
-                            boxShadow: '0 0 8px #00D775',
+                            background: 'var(--accent-color)',
+                            boxShadow: '0 0 8px var(--accent-color)',
                             animation: 'pulse 2s infinite'
                         }} />
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#00D775' }}>EN LÍNEA</span>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-color)', letterSpacing: '1px' }}>EN LÍNEA</span>
                     </div>
                 )}
 
                 <div style={{ marginBottom: '16px' }}>
-                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.5 }}>
+                    <span style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px', color: 'var(--text-muted)' }}>
                         Turno Actual
                     </span>
                 </div>
 
-                <h2 style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 16px 0' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '700', margin: '0 0 24px 0' }}>
                     {isActive ? 'En Progreso' : 'Listo para Iniciar'}
                 </h2>
 
-                {isActive && (
-                    <div style={{ display: 'flex', gap: '24px' }}>
+                {isActive ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                         <div>
-                            <div style={{ fontSize: '11px', opacity: 0.5, marginBottom: '4px' }}>Ganancia</div>
-                            <div style={{ fontSize: '24px', fontWeight: '700', color: '#00D775' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Ganancia</div>
+                            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--accent-color)', textShadow: '0 0 20px rgba(0, 230, 118, 0.3)' }}>
                                 ${metrics.totalEarnings.toFixed(0)}
                             </div>
                         </div>
                         <div>
-                            <div style={{ fontSize: '11px', opacity: 0.5, marginBottom: '4px' }}>Millas</div>
-                            <div style={{ fontSize: '24px', fontWeight: '700' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Millas</div>
+                            <div style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text-primary)' }}>
                                 {metrics.milesDriven.toFixed(1)}
                             </div>
                         </div>
                         <div>
-                            <div style={{ fontSize: '11px', opacity: 0.5, marginBottom: '4px' }}>Neto</div>
-                            <div style={{ fontSize: '24px', fontWeight: '700', color: netEarnings > 0 ? '#00D775' : '#EF4444' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Neto Est.</div>
+                            <div style={{ fontSize: '24px', fontWeight: '700', color: netEarnings > 0 ? 'var(--accent-color)' : 'var(--accent-alert)' }}>
                                 ${netEarnings.toFixed(0)}
                             </div>
                         </div>
                     </div>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)', fontSize: '14px' }}>
+                        <Clock size={16} />
+                        <span>Sin actividad reciente</span>
+                    </div>
                 )}
 
                 <div style={{
-                    position: 'absolute', bottom: '20px', right: '20px',
-                    opacity: 0.3
+                    position: 'absolute', bottom: '24px', right: '24px',
+                    opacity: 0.5, color: isActive ? 'var(--accent-color)' : 'var(--text-muted)'
                 }}>
                     <ChevronRight size={24} />
                 </div>
@@ -221,31 +224,25 @@ export default function HomeMenu({ onNavigate }) {
                     onClick={() => onNavigate('dashboard')}
                     style={{
                         background: isActive
-                            ? 'linear-gradient(135deg, #00D775 0%, #00B861 100%)'
-                            : 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                        border: 'none',
-                        borderRadius: '20px',
+                            ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 230, 118, 0.05) 100%)'
+                            : 'linear-gradient(135deg, rgba(255, 179, 0, 0.2) 0%, rgba(255, 179, 0, 0.05) 100%)',
+                        border: isActive ? '1px solid rgba(0, 230, 118, 0.4)' : '1px solid rgba(255, 179, 0, 0.4)',
+                        borderRadius: 'var(--radius-lg)',
                         padding: '24px',
                         cursor: 'pointer',
                         textAlign: 'left',
                         position: 'relative',
                         overflow: 'hidden',
                         minHeight: '140px',
-                        boxShadow: isActive
-                            ? '0 8px 32px rgba(0, 215, 117, 0.3)'
-                            : '0 8px 32px rgba(245, 158, 11, 0.3)'
+                        transition: 'transform 0.2s',
                     }}
+                    className="grid-btn"
                 >
-                    <div style={{
-                        position: 'absolute', top: '-20px', right: '-20px',
-                        width: '100px', height: '100px', borderRadius: '50%',
-                        background: 'rgba(255,255,255,0.1)'
-                    }} />
-                    <Power size={32} color="white" style={{ marginBottom: '12px' }} />
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'white' }}>
+                    <Power size={32} color={isActive ? "var(--accent-color)" : "var(--accent-secondary)"} style={{ marginBottom: '16px' }} />
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
                         {isActive ? 'Gestionar' : 'Iniciar'}
                     </div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         {isActive ? 'Ver dashboard' : 'Nuevo turno'}
                     </div>
                 </button>
@@ -254,9 +251,9 @@ export default function HomeMenu({ onNavigate }) {
                 <button
                     onClick={() => onNavigate('stats')}
                     style={{
-                        background: 'linear-gradient(145deg, rgba(99, 102, 241, 0.2) 0%, rgba(30, 41, 59, 0.8) 100%)',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '20px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-lg)',
                         padding: '24px',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -264,12 +261,13 @@ export default function HomeMenu({ onNavigate }) {
                         overflow: 'hidden',
                         minHeight: '140px'
                     }}
+                    className="grid-btn"
                 >
-                    <BarChart2 size={32} color="#818CF8" style={{ marginBottom: '12px' }} />
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'white' }}>
+                    <BarChart2 size={32} color="#4FC3F7" style={{ marginBottom: '16px' }} />
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
                         Estadísticas
                     </div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Análisis detallado
                     </div>
                 </button>
@@ -278,9 +276,9 @@ export default function HomeMenu({ onNavigate }) {
                 <button
                     onClick={() => onNavigate('history')}
                     style={{
-                        background: 'linear-gradient(145deg, rgba(236, 72, 153, 0.15) 0%, rgba(30, 41, 59, 0.8) 100%)',
-                        border: '1px solid rgba(236, 72, 153, 0.2)',
-                        borderRadius: '20px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-lg)',
                         padding: '24px',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -288,12 +286,13 @@ export default function HomeMenu({ onNavigate }) {
                         overflow: 'hidden',
                         minHeight: '140px'
                     }}
+                    className="grid-btn"
                 >
-                    <History size={32} color="#F472B6" style={{ marginBottom: '12px' }} />
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'white' }}>
+                    <History size={32} color="#F06292" style={{ marginBottom: '16px' }} />
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
                         Historial
                     </div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Turnos anteriores
                     </div>
                 </button>
@@ -302,9 +301,9 @@ export default function HomeMenu({ onNavigate }) {
                 <button
                     onClick={() => onNavigate('settings')}
                     style={{
-                        background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        borderRadius: '20px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 'var(--radius-lg)',
                         padding: '24px',
                         cursor: 'pointer',
                         textAlign: 'left',
@@ -312,12 +311,13 @@ export default function HomeMenu({ onNavigate }) {
                         overflow: 'hidden',
                         minHeight: '140px'
                     }}
+                    className="grid-btn"
                 >
-                    <Settings size={32} color="rgba(255,255,255,0.6)" style={{ marginBottom: '12px' }} />
-                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'white' }}>
+                    <Settings size={32} color="var(--text-muted)" style={{ marginBottom: '16px' }} />
+                    <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)' }}>
                         Ajustes
                     </div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '4px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                         Configuración
                     </div>
                 </button>
@@ -327,11 +327,12 @@ export default function HomeMenu({ onNavigate }) {
             <div style={{
                 marginTop: '40px',
                 textAlign: 'center',
-                opacity: 0.3,
+                color: 'var(--text-muted)',
+                opacity: 0.5,
                 fontSize: '12px'
             }}>
                 <Zap size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                Driver Pro Control v2.0
+                Driver Pro Control v2.1
             </div>
 
             {/* Animations */}
@@ -340,11 +341,11 @@ export default function HomeMenu({ onNavigate }) {
                     0%, 100% { opacity: 1; transform: scale(1); }
                     50% { opacity: 0.5; transform: scale(1.1); }
                 }
-                button:hover {
+                .grid-btn:hover {
                     transform: translateY(-2px);
-                    transition: transform 0.2s;
+                    background: rgba(255, 255, 255, 0.03) !important;
                 }
-                button:active {
+                .grid-btn:active {
                     transform: scale(0.98);
                 }
             `}</style>

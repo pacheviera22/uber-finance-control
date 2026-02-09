@@ -85,10 +85,11 @@ export default function Stopwatch() {
     const isPaused = session.status === 'paused';
 
     return (
-        <div style={{
-            background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.95) 100%)',
-            borderRadius: '24px', border: '1px solid rgba(255,255,255,0.08)',
-            padding: '28px 24px', position: 'relative', marginBottom: '20px', overflow: 'hidden'
+        <div className="card" style={{
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            padding: '28px 24px', position: 'relative', marginBottom: '20px', overflow: 'hidden',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
         }}>
             <EndShiftModal isOpen={isEndModalOpen} onClose={() => setIsEndModalOpen(false)} />
 
@@ -97,7 +98,7 @@ export default function Stopwatch() {
                 <div style={{
                     position: 'absolute', top: '-50px', right: '-50px',
                     width: '200px', height: '200px', borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(0, 215, 117, 0.15) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(0, 230, 118, 0.15) 0%, transparent 70%)',
                     pointerEvents: 'none'
                 }} />
             )}
@@ -107,24 +108,25 @@ export default function Stopwatch() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{
                         width: '44px', height: '44px', borderRadius: '14px',
-                        background: isActive ? 'linear-gradient(135deg, #00D775 0%, #00B861 100%)' : 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
+                        background: isActive ? 'linear-gradient(135deg, rgba(0, 230, 118, 0.2) 0%, rgba(0, 230, 118, 0.05) 100%)' : 'rgba(255, 179, 0, 0.1)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        boxShadow: isActive ? '0 4px 16px rgba(0, 215, 117, 0.3)' : '0 4px 16px rgba(245, 158, 11, 0.3)'
+                        boxShadow: isActive ? '0 4px 16px rgba(0, 230, 118, 0.2)' : 'none',
+                        border: isActive ? '1px solid rgba(0, 230, 118, 0.2)' : '1px solid rgba(255, 179, 0, 0.2)'
                     }}>
-                        <Clock size={22} color="white" />
+                        <Clock size={22} color={isActive ? "var(--accent-color)" : "var(--accent-secondary)"} />
                     </div>
                     <div>
-                        <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'rgba(255,255,255,0.5)' }}>
+                        <div style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>
                             {t.timeOnline}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{
                                 width: '8px', height: '8px', borderRadius: '50%',
-                                background: isActive ? '#00D775' : '#F59E0B',
-                                boxShadow: `0 0 8px ${isActive ? '#00D775' : '#F59E0B'}`,
+                                background: isActive ? 'var(--accent-color)' : 'var(--accent-secondary)',
+                                boxShadow: `0 0 8px ${isActive ? 'var(--accent-color)' : 'var(--accent-secondary)'}`,
                                 animation: isActive ? 'pulse 2s infinite' : 'none'
                             }} />
-                            <span style={{ fontSize: '13px', fontWeight: '600', color: isActive ? '#00D775' : '#F59E0B' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '600', color: isActive ? 'var(--accent-color)' : 'var(--accent-secondary)' }}>
                                 {isActive ? 'Activo' : 'Pausado'}
                             </span>
                         </div>
@@ -132,8 +134,8 @@ export default function Stopwatch() {
                 </div>
                 {!isEditing && (
                     <button onClick={handleEditClick} style={{
-                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '10px', padding: '10px', cursor: 'pointer', color: 'rgba(255,255,255,0.6)'
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)',
+                        borderRadius: '10px', padding: '10px', cursor: 'pointer', color: 'var(--text-muted)'
                     }}>
                         <Edit2 size={16} />
                     </button>
@@ -149,20 +151,20 @@ export default function Stopwatch() {
                         { label: t.targetEndTime, value: editEndTimeStr, type: 'datetime-local', set: setEditEndTimeStr }
                     ].map((field, i) => (
                         <div key={i}>
-                            <label style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', display: 'block' }}>{field.label}</label>
+                            <label style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>{field.label}</label>
                             <input type={field.type} value={field.value} onChange={(e) => field.set(e.target.value)}
-                                style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', color: 'white', fontSize: '14px' }}
+                                style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', borderRadius: '10px', color: 'var(--text-primary)', fontSize: '14px' }}
                             />
                         </div>
                     ))}
                     <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                         <button onClick={handleSaveEdit} style={{
-                            flex: 1, padding: '12px', background: 'linear-gradient(135deg, #00D775 0%, #00B861 100%)',
-                            border: 'none', borderRadius: '12px', color: 'white', fontWeight: '600', cursor: 'pointer'
+                            flex: 1, padding: '12px', background: 'rgba(0, 230, 118, 0.2)',
+                            border: '1px solid var(--accent-color)', borderRadius: '12px', color: 'var(--accent-color)', fontWeight: '600', cursor: 'pointer'
                         }}>{t.update}</button>
                         <button onClick={() => setIsEditing(false)} style={{
                             flex: 1, padding: '12px', background: 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: 'rgba(255,255,255,0.6)', cursor: 'pointer'
+                            border: '1px solid var(--border-color)', borderRadius: '12px', color: 'var(--text-muted)', cursor: 'pointer'
                         }}>{t.cancel}</button>
                     </div>
                 </div>
@@ -170,8 +172,8 @@ export default function Stopwatch() {
                 <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                     <div style={{
                         fontSize: '52px', fontFamily: "'SF Mono', 'Fira Code', monospace", fontWeight: '700',
-                        color: isPaused ? '#F59E0B' : 'white', letterSpacing: '2px',
-                        textShadow: isActive ? '0 0 30px rgba(0, 215, 117, 0.3)' : 'none'
+                        color: isPaused ? 'var(--accent-secondary)' : 'var(--text-primary)', letterSpacing: '2px',
+                        textShadow: isActive ? '0 0 30px rgba(0, 230, 118, 0.3)' : 'none'
                     }}>
                         {formatTime(elapsed)}
                     </div>
@@ -182,8 +184,8 @@ export default function Stopwatch() {
             <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '20px' }}>
                 {isActive ? (
                     <button onClick={actions.pauseShift} style={{
-                        padding: '14px 32px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: '16px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+                        padding: '14px 32px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-color)',
+                        borderRadius: '16px', color: 'var(--text-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
                         fontSize: '15px', fontWeight: '600'
                     }}>
                         <Pause size={20} />
@@ -191,11 +193,11 @@ export default function Stopwatch() {
                     </button>
                 ) : (
                     <button onClick={actions.resumeShift} style={{
-                        padding: '14px 32px', background: 'linear-gradient(135deg, #00D775 0%, #00B861 100%)',
-                        border: 'none', borderRadius: '16px', color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
-                        fontSize: '15px', fontWeight: '600', boxShadow: '0 4px 20px rgba(0, 215, 117, 0.3)'
+                        padding: '14px 32px', background: 'rgba(0, 230, 118, 0.1)',
+                        border: '1px solid var(--accent-color)', borderRadius: '16px', color: 'var(--accent-color)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px',
+                        fontSize: '15px', fontWeight: '600', boxShadow: '0 0 20px rgba(0, 230, 118, 0.2)'
                     }}>
-                        <Play size={20} fill="white" />
+                        <Play size={20} fill="currentColor" />
                         {t.resume}
                     </button>
                 )}
@@ -204,8 +206,8 @@ export default function Stopwatch() {
             {/* End Shift Button */}
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
                 <button onClick={() => setIsEndModalOpen(true)} style={{
-                    background: 'none', border: '1px solid rgba(255,255,255,0.15)',
-                    color: 'rgba(255,255,255,0.5)', padding: '10px 20px', borderRadius: '12px',
+                    background: 'none', border: '1px solid var(--border-color)',
+                    color: 'var(--text-muted)', padding: '10px 20px', borderRadius: '12px',
                     fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer'
                 }}>
                     <Flag size={14} />
@@ -216,22 +218,24 @@ export default function Stopwatch() {
             {/* Stats Grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{
-                    background: 'rgba(0,0,0,0.25)', borderRadius: '16px', padding: '16px', textAlign: 'center'
+                    background: 'rgba(0,0,0,0.25)', borderRadius: '16px', padding: '16px', textAlign: 'center',
+                    border: '1px solid var(--border-color)'
                 }}>
-                    <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                         {t.currentHr}
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: earningsPerHour > 20 ? '#00D775' : 'white' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: earningsPerHour > 20 ? 'var(--accent-color)' : 'var(--text-primary)' }}>
                         ${earningsPerHour.toFixed(2)}
                     </div>
                 </div>
                 <div style={{
-                    background: 'rgba(0,0,0,0.25)', borderRadius: '16px', padding: '16px', textAlign: 'center'
+                    background: 'rgba(0,0,0,0.25)', borderRadius: '16px', padding: '16px', textAlign: 'center',
+                    border: '1px solid var(--border-color)'
                 }}>
-                    <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)', marginBottom: '6px' }}>
                         {t.requiredHr}
                     </div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: requiredRate > earningsPerHour ? '#F59E0B' : 'white' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', color: requiredRate > earningsPerHour ? 'var(--accent-secondary)' : 'var(--text-primary)' }}>
                         ${requiredRate.toFixed(2)}
                     </div>
                 </div>

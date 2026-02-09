@@ -19,8 +19,8 @@ export default function TripList() {
     }
 
     return (
-        <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', fontWeight: 'bold' }}>
+        <div className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-color)', background: 'var(--bg-card)' }}>
+            <div style={{ padding: '16px', borderBottom: '1px solid var(--border-color)', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                 {t.recentActivity}
             </div>
             <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -28,8 +28,7 @@ export default function TripList() {
                     const isCash = trip.platform === 'cash';
                     const isLyft = trip.platform === 'lyft';
                     // Default Uber or unknown
-                    // Default Uber or unknown
-                    const color = isCash ? '#00D775' : (isLyft ? '#FF00BF' : 'var(--text-primary)');
+                    const color = isCash ? 'var(--accent-color)' : (isLyft ? '#FF00BF' : 'var(--text-primary)');
                     const Icon = isCash ? Banknote : Car;
 
                     // Cost Calculation
@@ -45,7 +44,7 @@ export default function TripList() {
                     return (
                         <div key={trip.id} className="flex-between" style={{
                             padding: '12px 16px',
-                            borderBottom: '1px solid rgba(255,255,255,0.05)'
+                            borderBottom: '1px solid var(--border-color)'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{
@@ -58,23 +57,23 @@ export default function TripList() {
                                     <Icon size={16} />
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--accent-color)' }}>
+                                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                                         ${trip.amount.toFixed(2)}
                                     </div>
-                                    <div className="text-muted" style={{ fontSize: '12px' }}>
+                                    <div className="text-muted" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                         {new Date(trip.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {trip.odometer} {t.odo}
                                     </div>
                                     {distance > 0 && (
                                         <div style={{ fontSize: '10px', marginTop: '2px', color: 'var(--text-muted)' }}>
-                                            <span style={{ color: '#ff4d4d' }}>Op: ${totalCost.toFixed(2)}</span> •
-                                            <span style={{ color: '#00D775', marginLeft: '4px' }}>Net: ${netProfit.toFixed(2)}</span>
+                                            <span style={{ color: 'var(--accent-alert)' }}>Op: ${totalCost.toFixed(2)}</span> •
+                                            <span style={{ color: 'var(--accent-color)', marginLeft: '4px' }}>Net: ${netProfit.toFixed(2)}</span>
                                         </div>
                                     )}
                                 </div>
                             </div>
                             <button
                                 onClick={() => actions.deleteTrip(trip.id)}
-                                style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}
+                                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
                             >
                                 <Trash2 size={16} />
                             </button>

@@ -326,7 +326,10 @@ export default function MetricsComparison() {
     const tripsPerHour = workedHours > 0 ? filteredData.tripCount / workedHours : 0;
 
     const deadheadMiles = filteredData.totalMiles - filteredData.productiveMiles;
+
     const deadheadPct = filteredData.totalMiles > 0 ? (deadheadMiles / filteredData.totalMiles) * 100 : 0;
+
+
 
     // Projections only make sense for ACTIVE session
     let projectedTotal = 0;
@@ -386,6 +389,17 @@ export default function MetricsComparison() {
     // If viewing today, we might want to sync the goal back if it changed? 
     // Actually, let's trust the logic: specific day record > session default
 
+    // Monto Minimo Calculation
+    // Logic from Stopwatch.jsx: Required Rate = Meta Restante / Time Left
+    const timeLeftMs = session.endTime ? (session.endTime - Date.now()) : 0;
+    const timeLeftHours = Math.max(0, timeLeftMs / 3600000);
+
+    // If we have time left, calculate required rate. Otherwise 0.
+    const requiredHourlyGross = timeLeftHours > 0 ? (metrics.metaRestante / timeLeftHours) : 0;
+
+    // Min Trip Value = Required Hourly / Trips Per Hour
+    const minTripValue = tripsPerHour > 0 ? requiredHourlyGross / tripsPerHour : 0;
+
     const goalProgress = Math.min((filteredData.totalEarnings / dailyGoal) * 100, 100);
     const onTrack = isViewingActiveSession ? (projectedTotal >= dailyGoal) : (filteredData.totalEarnings >= dailyGoal);
 
@@ -399,7 +413,7 @@ export default function MetricsComparison() {
     const advancedMetrics = [
         { label: '$/HR NETO', value: netPerHour, format: v => `$${v.toFixed(2)}`, color: netPerHour >= 20 ? '#00D775' : netPerHour >= 15 ? '#F59E0B' : '#EF4444' },
         { label: 'VIAJES/HR', value: tripsPerHour, format: v => v.toFixed(1), color: '#fff' },
-        { label: 'MILLAS VACÍAS', value: deadheadPct, format: v => `${v.toFixed(0)}%`, color: deadheadPct < 10 ? '#00D775' : deadheadPct < 25 ? '#F59E0B' : '#EF4444' },
+        { label: 'MONTO MIN/VIAJE', value: minTripValue, format: v => `$${v.toFixed(2)}`, color: '#fff' },
         { label: showProjection ? 'PROYECCIÓN' : 'TOTAL', value: projectedTotal, format: v => `$${v.toFixed(0)}`, color: '#667eea' }
     ];
 
@@ -579,9 +593,9 @@ export default function MetricsComparison() {
                             <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Viajes/Hr</div>
                             <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>{tripsPerHour.toFixed(1)}</div>
                         </div>
-                        <div style={{ background: deadheadPct > 30 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '14px', textAlign: 'center', border: deadheadPct > 30 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255,255,255,0.08)' }}>
-                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Millas Vacías</div>
-                            <div style={{ fontSize: '20px', fontWeight: '800', color: deadheadPct > 30 ? '#EF4444' : '#00D775' }}>{deadheadPct.toFixed(0)}%</div>
+                        <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Monto Min/Viaje</div>
+                            <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>${minTripValue.toFixed(2)}</div>
                         </div>
                         <div style={{ background: 'linear-gradient(145deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.05))', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(102, 126, 234, 0.2)' }}>
                             <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Proyección</div>
