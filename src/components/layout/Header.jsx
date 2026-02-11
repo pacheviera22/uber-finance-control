@@ -3,12 +3,11 @@ import { useFinance } from '../../context/FinanceContext';
 import { TrendingUp, Clock, Edit2, Check } from 'lucide-react';
 
 export default function Header() {
-    // NEW: Deconstruct currentDailyGoal
-    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal, currentDailyGoal } = useFinance();
+    // NEW: Deconstruct currentDailyGoal and actions
+    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal, currentDailyGoal, actions } = useFinance();
 
     // Safe defaults - Use currentDailyGoal directly
     const goal = currentDailyGoal || 100;
-    // console.log("Header Rendered. Goal:", goal); 
     const current = metrics.totalEarnings || 0;
     const progress = Math.min((current / goal) * 100, 100);
 
@@ -32,7 +31,6 @@ export default function Header() {
     // Edit Daily Goal State
     const [isEditingDaily, setIsEditingDaily] = useState(false);
     const [tempDaily, setTempDaily] = useState(goal);
-    const { updateDailyGoal } = useFinance();
 
     useEffect(() => {
         if (!isEditingDaily) setTempDaily(goal);
@@ -42,7 +40,7 @@ export default function Header() {
         const val = parseFloat(tempDaily);
         console.log("Saving Daily Goal:", val);
         if (!isNaN(val) && val > 0) {
-            updateDailyGoal(val);
+            actions.updateDailyGoal(val);
             // Force local update if context is slow
             setTempDaily(val);
         } else {
