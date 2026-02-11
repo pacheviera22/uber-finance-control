@@ -372,9 +372,19 @@ export const FinanceProvider = ({ children }) => {
     };
 
     const updateDailyGoal = (newGoal) => {
+        const val = parseFloat(newGoal);
+
+        // 1. Update Session (Current View)
         updateSessionInCloud({
-            meta: parseFloat(newGoal)
+            meta: val
         });
+
+        // 2. Update Daily Record (History) if exists for today
+        // We use the start time of the session to determine "today" relative to the shift
+        if (session.startTime) {
+            const dateStr = new Date(session.startTime).toISOString().split('T')[0];
+            updateDailyRecord(dateStr, { dailyGoal: val });
+        }
     };
 
     // Weekly Goal (Local Storage)
