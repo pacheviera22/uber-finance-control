@@ -226,7 +226,26 @@ export const FinanceProvider = ({ children }) => {
         if (newData.totalPausedTime !== undefined) dbData.total_paused_time = newData.totalPausedTime;
         if (newData.gpsMiles !== undefined) dbData.gps_miles = newData.gpsMiles;
 
-        await supabase.from('sessions').update(dbData).eq('id', 1);
+        try {
+            const { error, count } = await supabase
+                .from('sessions')
+                .update(dbData)
+                .eq('id', 1)
+                .select('*', { count: 'exact' });
+
+            if (error) {
+                console.error("Error updating session in Supabase:", error);
+                alert(`Error guardando datos: ${error.message}`);
+            } else if (count === 0) {
+                console.warn("No session row found with ID 1 to update.");
+                alert("Error: No se encontró la sesión en la nube para actualizar.");
+            } else {
+                console.log("Session updated successfully", dbData);
+            }
+        } catch (err) {
+            console.error("Unexpected error updating session:", err);
+            alert("Error inesperado al guardar datos.");
+        }
     };
 
     const startNewShift = (meta, initialOdometer, endTime, startTime = Date.now()) => {
@@ -352,6 +371,12 @@ export const FinanceProvider = ({ children }) => {
         if (error) console.error("Error updating daily record:", error);
     };
 
+    const updateDailyGoal = (newGoal) => {
+        updateSessionInCloud({
+            meta: parseFloat(newGoal)
+        });
+    };
+
     // Weekly Goal (Local Storage)
     const [weeklyGoal, setWeeklyGoal] = useState(() => {
         return parseFloat(localStorage.getItem('uber_weekly_goal')) || 1000;
@@ -375,7 +400,8 @@ export const FinanceProvider = ({ children }) => {
         updateStartOdometer,
         updateEndTime,
         updateConfig,
-        updateDailyRecord
+        updateDailyRecord,
+        updateDailyGoal
     }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile, dailyRecords]); // Dependencies for actions? mostly they use refs or current state... actually better to keep them stable if possible, but they use 'session' in closure... 
     // Ideally actions should use functional updates or refs to be truly stable, but for now memoizing them with dependencies is better than nothing.
     // Actually, many use 'session' directly. 
@@ -453,7 +479,8 @@ export const FinanceProvider = ({ children }) => {
             updateStartOdometer,
             updateEndTime,
             updateConfig,
-            updateDailyRecord
+            updateDailyRecord,
+            updateDailyGoal
         },
         metrics,
         updateWeeklyGoal

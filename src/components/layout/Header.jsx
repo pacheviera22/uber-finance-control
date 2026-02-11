@@ -27,6 +27,23 @@ export default function Header() {
         setIsEditingGoal(false);
     };
 
+    // Edit Daily Goal State
+    const [isEditingDaily, setIsEditingDaily] = useState(false);
+    const [tempDaily, setTempDaily] = useState(goal);
+    const { updateDailyGoal } = useFinance();
+
+    useEffect(() => {
+        if (!isEditingDaily) setTempDaily(goal);
+    }, [goal, isEditingDaily]);
+
+    const handleSaveDaily = () => {
+        const val = parseFloat(tempDaily);
+        if (!isNaN(val) && val > 0) {
+            updateDailyGoal(val);
+        }
+        setIsEditingDaily(false);
+    };
+
     return (
         <header className="card glass-card" style={{ marginBottom: '16px', padding: '16px' }}>
             <div className="flex-between" style={{ marginBottom: '8px' }}>
@@ -45,7 +62,36 @@ export default function Header() {
                     <span className="text-accent" style={{ fontWeight: 'bold' }}>
                         ${current.toFixed(2)}
                     </span>
-                    <span className="text-muted">/ ${goal}</span>
+                    <span className="text-muted">/ </span>
+                    {isEditingDaily ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <input
+                                type="number"
+                                value={tempDaily}
+                                onChange={(e) => setTempDaily(e.target.value)}
+                                style={{
+                                    width: '60px',
+                                    background: '#000',
+                                    border: '1px solid var(--accent-color)',
+                                    color: '#fff',
+                                    borderRadius: '4px',
+                                    padding: '2px 4px',
+                                    fontSize: '12px'
+                                }}
+                                autoFocus
+                            />
+                            <button onClick={handleSaveDaily} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#00D775' }}>
+                                <Check size={14} />
+                            </button>
+                        </div>
+                    ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <span className="text-muted">${goal}</span>
+                            <button onClick={() => setIsEditingDaily(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', opacity: 0.5 }}>
+                                <Edit2 size={12} color="#fff" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
