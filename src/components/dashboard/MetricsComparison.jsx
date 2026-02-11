@@ -389,27 +389,18 @@ export default function MetricsComparison() {
     // If viewing today, we might want to sync the goal back if it changed? 
     // Actually, let's trust the logic: specific day record > session default
 
-    // Advanced Minimum Trip Value Calculation
+    // Minimum Trip Value Calculation (GROSS basis)
+    // Goal is GROSS earnings, so we calculate minimum GROSS per trip
     const timeLeftMs = session.endTime ? (session.endTime - Date.now()) : 0;
     const timeLeftHours = Math.max(0, timeLeftMs / 3600000);
-
-    // Calculate average miles and cost per trip
-    const avgMilesPerTrip = filteredData.tripCount > 0
-        ? filteredData.totalMiles / filteredData.tripCount
-        : 5; // Default assumption: 5 miles per trip
-
-    const avgCostPerTrip = (
-        (avgMilesPerTrip / config.vehicleMpg * effectiveGasPrice) +
-        (avgMilesPerTrip * config.maintenanceCostPerMile)
-    );
 
     // Estimate remaining trips based on historical rate
     const estimatedTripsRemaining = timeLeftHours * tripsPerHour;
 
-    // Calculate minimum gross per trip (includes operating costs)
+    // Calculate minimum GROSS per trip to reach GROSS goal
     // CRITICAL: Use Math.max(1, estimatedTripsRemaining) to avoid division issues
     const minGrossPerTrip = estimatedTripsRemaining > 0
-        ? (metrics.metaRestante + (avgCostPerTrip * estimatedTripsRemaining)) / Math.max(1, estimatedTripsRemaining)
+        ? metrics.metaRestante / Math.max(1, estimatedTripsRemaining)
         : 0;
 
     // Apply 10% safety buffer for variability
