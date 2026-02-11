@@ -7,6 +7,7 @@ export default function Header() {
 
     // Safe defaults
     const goal = session.meta || 100;
+    // console.log("Header Rendered. Goal from session:", goal); // Debug log (can be removed later)
     const current = metrics.totalEarnings || 0;
     const progress = Math.min((current / goal) * 100, 100);
 
@@ -38,8 +39,13 @@ export default function Header() {
 
     const handleSaveDaily = () => {
         const val = parseFloat(tempDaily);
+        console.log("Saving Daily Goal:", val);
         if (!isNaN(val) && val > 0) {
             updateDailyGoal(val);
+            // Force local update if context is slow
+            setTempDaily(val);
+        } else {
+            console.warn("Invalid daily goal value:", tempDaily);
         }
         setIsEditingDaily(false);
     };

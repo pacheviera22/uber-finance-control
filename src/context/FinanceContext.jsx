@@ -379,12 +379,13 @@ export const FinanceProvider = ({ children }) => {
             meta: val
         });
 
-        // 2. Update Daily Record (History) if exists for today
-        // We use the start time of the session to determine "today" relative to the shift
-        if (session.startTime) {
-            const dateStr = new Date(session.startTime).toISOString().split('T')[0];
-            updateDailyRecord(dateStr, { dailyGoal: val });
-        }
+        // 2. Update Daily Record (History)
+        // Use session start time if active, otherwise use today's date
+        const dateBasis = session.startTime ? new Date(session.startTime) : new Date();
+        const dateStr = dateBasis.toLocaleDateString('en-CA'); // YYYY-MM-DD format local
+
+        console.log(`Updating daily goal for ${dateStr}: ${val}`);
+        updateDailyRecord(dateStr, { dailyGoal: val });
     };
 
     // Weekly Goal (Local Storage)
