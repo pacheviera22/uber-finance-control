@@ -3,11 +3,12 @@ import { useFinance } from '../../context/FinanceContext';
 import { TrendingUp, Clock, Edit2, Check } from 'lucide-react';
 
 export default function Header() {
-    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal } = useFinance();
+    // NEW: Deconstruct currentDailyGoal
+    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal, currentDailyGoal } = useFinance();
 
-    // Safe defaults
-    const goal = session.meta || 100;
-    // console.log("Header Rendered. Goal from session:", goal); // Debug log (can be removed later)
+    // Safe defaults - Use currentDailyGoal directly
+    const goal = currentDailyGoal || 100;
+    // console.log("Header Rendered. Goal:", goal); 
     const current = metrics.totalEarnings || 0;
     const progress = Math.min((current / goal) * 100, 100);
 
