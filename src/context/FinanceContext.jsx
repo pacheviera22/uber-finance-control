@@ -65,6 +65,20 @@ export const FinanceProvider = ({ children }) => {
     // NEW: Explicit state for current daily goal, decoupled from session.meta
     const [currentDailyGoal, setCurrentDailyGoal] = useState(250); // Default 250
 
+    // Weekly Goal State (migrating from localStorage to Supabase)
+    const [currentWeeklyGoal, setCurrentWeeklyGoal] = useState(1000); // Default 1000
+    const [weeklyRecords, setWeeklyRecords] = useState({});
+
+    // Helper function to get week start date (Monday)
+    const getWeekStartDate = () => {
+        const now = new Date();
+        const day = now.getDay(); // 0 is Sunday
+        const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+        const monday = new Date(now.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        return monday.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+    };
+
     // Initial Load & Realtime Subscription
     useEffect(() => {
         const loadDat = async () => {
@@ -72,15 +86,17 @@ export const FinanceProvider = ({ children }) => {
 
             // 1. Parallel Fetching (Avoid Waterfall)
             try {
-                const [sessionRes, tripsRes, dailyRes] = await Promise.all([
+                const [sessionRes, tripsRes, dailyRes, weeklyRes] = await Promise.all([
                     supabase.from('sessions').select('*').eq('id', 1).single(),
                     supabase.from('trips').select('*').order('timestamp', { ascending: true }),
-                    supabase.from('daily_records').select('*')
+                    supabase.from('daily_records').select('*'),
+                    supabase.from('weekly_records').select('*')
                 ]);
 
                 const { data: sessionData, error: sessionError } = sessionRes;
                 const { data: tripsData } = tripsRes;
                 const { data: dailyData } = dailyRes;
+                const { data: weeklyData } = weeklyRes;
 
                 // Process Session
                 if (sessionData) {
@@ -128,6 +144,25 @@ export const FinanceProvider = ({ children }) => {
                     if (recordsMap[todayStr] && recordsMap[todayStr].dailyGoal > 0) {
                         console.log(`Setting currentDailyGoal from history: ${recordsMap[todayStr].dailyGoal}`);
                         setCurrentDailyGoal(recordsMap[todayStr].dailyGoal);
+                    }
+                }
+
+                // Process Weekly Records
+                if (weeklyData) {
+                    const weeklyMap = {};
+                    weeklyData.forEach(r => {
+                        weeklyMap[r.week_start_date] = {
+                            weeklyGoal: Number(r.weekly_goal),
+                            notes: r.notes
+                        };
+                    });
+                    setWeeklyRecords(weeklyMap);
+
+                    // Set Current Weekly Goal from THIS WEEK'S record
+                    const weekStart = getWeekStartDate();
+                    if (weeklyMap[weekStart] && weeklyMap[weekStart].weeklyGoal > 0) {
+                        console.log(`Setting currentWeeklyGoal from history: ${weeklyMap[weekStart].weeklyGoal}`);
+                        setCurrentWeeklyGoal(weeklyMap[weekStart].weeklyGoal);
                     }
                 }
             } catch (error) {
@@ -211,6 +246,28 @@ export const FinanceProvider = ({ children }) => {
                         if (payload.new.date === todayStr) {
                             console.log("Realtime: Daily record updated for today. Syncing currentDailyGoal.");
                             setCurrentDailyGoal(Number(payload.new.daily_goal));
+                        }
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'weekly_records' },
+                (payload) => {
+                    if (payload.new) {
+                        setWeeklyRecords(prev => ({
+                            ...prev,
+                            [payload.new.week_start_date]: {
+                                weeklyGoal: Number(payload.new.weekly_goal),
+                                notes: payload.new.notes
+                            }
+                        }));
+
+                        // If the update is for THIS WEEK, sync currentWeeklyGoal
+                        const weekStart = getWeekStartDate();
+                        if (payload.new.week_start_date === weekStart) {
+                            console.log("Realtime: Weekly record updated for this week. Syncing currentWeeklyGoal.");
+                            setCurrentWeeklyGoal(Number(payload.new.weekly_goal));
                         }
                     }
                 }
@@ -403,14 +460,44 @@ export const FinanceProvider = ({ children }) => {
         });
     };
 
-    // Weekly Goal (Local Storage)
-    const [weeklyGoal, setWeeklyGoal] = useState(() => {
-        return parseFloat(localStorage.getItem('uber_weekly_goal')) || 1000;
-    });
+    // Weekly Record Update Function (similar to updateDailyRecord)
+    const updateWeeklyRecord = async (weekStartDate, updates) => {
+        // updates: { weeklyGoal?: number, notes?: string }
+        const currentRecord = weeklyRecords[weekStartDate] || {};
+        const newRecord = { ...currentRecord, ...updates };
 
-    const updateWeeklyGoal = (amount) => {
-        setWeeklyGoal(amount);
-        localStorage.setItem('uber_weekly_goal', amount);
+        // Optimistic update
+        setWeeklyRecords(prev => ({
+            ...prev,
+            [weekStartDate]: newRecord
+        }));
+
+        // DB Update (Upsert)
+        const { error } = await supabase
+            .from('weekly_records')
+            .upsert({
+                week_start_date: weekStartDate,
+                weekly_goal: newRecord.weeklyGoal,
+                notes: newRecord.notes
+            });
+
+        if (error) console.error("Error updating weekly record:", error);
+    };
+
+    const updateWeeklyGoal = (newGoal) => {
+        const val = parseFloat(newGoal);
+
+        // 1. Update Local State immediately
+        setCurrentWeeklyGoal(val);
+
+        // 2. Update Weekly Record (Source of Truth)
+        const weekStart = getWeekStartDate();
+
+        console.log(`Updating weekly goal for week ${weekStart}: ${val}`);
+        updateWeeklyRecord(weekStart, { weeklyGoal: val });
+
+        // 3. Keep localStorage for backward compatibility (optional)
+        localStorage.setItem('uber_weekly_goal', val);
     };
 
     // Memoize Actions to prevent re-creation
@@ -427,8 +514,10 @@ export const FinanceProvider = ({ children }) => {
         updateEndTime,
         updateConfig,
         updateDailyRecord,
-        updateDailyGoal
-    }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile, dailyRecords]);
+        updateDailyGoal,
+        updateWeeklyRecord,
+        updateWeeklyGoal
+    }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile, dailyRecords, weeklyRecords]);
     console.log("DEBUG: Actions memoized");
 
     // Memoize Metrics Calculation
@@ -474,13 +563,13 @@ export const FinanceProvider = ({ children }) => {
             metaRestante,
             lastOdometer,
             weeklyEarnings,
-            weeklyGoal,
+            weeklyGoal: currentWeeklyGoal, // Use currentWeeklyGoal from state
             totalOperatingCost,
             totalNetProfit,
             currentSpeed: 0,
             currentDailyGoal
         };
-    }, [session.startTime, session.initialOdometer, currentDailyGoal, trips, config.vehicleMpg, config.gasPrice, config.maintenanceCostPerMile, weeklyGoal]);
+    }, [session.startTime, session.initialOdometer, currentDailyGoal, currentWeeklyGoal, trips, config.vehicleMpg, config.gasPrice, config.maintenanceCostPerMile]);
 
     // Memoize Context Value
     const value = React.useMemo(() => ({
@@ -493,11 +582,13 @@ export const FinanceProvider = ({ children }) => {
         trips: session.startTime ? trips.filter(t => t.timestamp >= session.startTime) : [],
         allTrips: trips,
         dailyRecords,
+        weeklyRecords,
         currentDailyGoal,
+        currentWeeklyGoal,
         actions,
         metrics,
         updateWeeklyGoal
-    }), [language, config, session, trips, dailyRecords, metrics, weeklyGoal, currentDailyGoal, actions]);
+    }), [language, config, session, trips, dailyRecords, weeklyRecords, metrics, currentDailyGoal, currentWeeklyGoal, actions]);
 
     return (
         <FinanceContext.Provider value={value}>

@@ -177,6 +177,33 @@ export default function Stopwatch() {
                     }}>
                         {formatTime(elapsed)}
                     </div>
+                    {/* Remaining Time Counter */}
+                    {session.endTime && (
+                        <div style={{
+                            textAlign: 'right',
+                            marginTop: '8px',
+                            paddingRight: '4px'
+                        }}>
+                            <div style={{
+                                fontSize: '11px',
+                                color: 'var(--text-muted)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                marginBottom: '2px'
+                            }}>
+                                {t.timeRemaining || 'Tiempo Restante'}
+                            </div>
+                            <div style={{
+                                fontSize: '18px',
+                                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                                fontWeight: '500',
+                                color: timeLeftMs > 0 ? 'var(--text-muted)' : 'var(--accent-secondary)',
+                                letterSpacing: '1px'
+                            }}>
+                                {formatTime(Math.max(0, timeLeftMs))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

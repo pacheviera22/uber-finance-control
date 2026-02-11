@@ -4,7 +4,7 @@ import { TrendingUp, Clock, Edit2, Check } from 'lucide-react';
 
 export default function Header() {
     // NEW: Deconstruct currentDailyGoal and actions
-    const { metrics, session, t, toggleLanguage, language, updateWeeklyGoal, currentDailyGoal, actions } = useFinance();
+    const { metrics, session, t, toggleLanguage, language, currentDailyGoal, actions } = useFinance();
 
     // Safe defaults - Use currentDailyGoal directly
     const goal = currentDailyGoal || 100;
@@ -23,7 +23,7 @@ export default function Header() {
     const handleSaveGoal = () => {
         const val = parseFloat(tempGoal);
         if (!isNaN(val) && val > 0) {
-            updateWeeklyGoal(val);
+            actions.updateWeeklyGoal(val);
         }
         setIsEditingGoal(false);
     };
