@@ -82,7 +82,7 @@ export const FinanceProvider = ({ children }) => {
                 const { data: tripsData } = tripsRes;
                 const { data: dailyData } = dailyRes;
 
-                // ... (Session processing kept for other fields) ...
+                // Process Session
                 if (sessionData) {
                     setSession({
                         status: sessionData.status,
@@ -94,8 +94,22 @@ export const FinanceProvider = ({ children }) => {
                         totalPausedTime: sessionData.total_paused_time,
                         gpsMiles: Number(sessionData.gps_miles || 0)
                     });
+                } else if (sessionError && sessionError.code === 'PGRST116') {
+                    console.warn("Session row not found. Did you run the SQL script?");
                 }
-                // ...
+
+                // Process Trips
+                if (tripsData) {
+                    setTrips(tripsData.map(t => ({
+                        ...t,
+                        amount: Number(t.amount),
+                        odometer: Number(t.odometer),
+                        timestamp: Number(t.timestamp),
+                        distance: Number(t.distance || 0),
+                        gasPrice: Number(t.gas_price || 0), // from DB snake_case
+                        mpg: Number(t.mpg || 24)
+                    })));
+                }
 
                 // Process Daily Records
                 if (dailyData) {
@@ -192,11 +206,11 @@ export const FinanceProvider = ({ children }) => {
                             }
                         }));
 
-                        // If the update is for TODAY, sync session.meta
+                        // If the update is for TODAY, sync currentDailyGoal
                         const todayStr = new Date().toLocaleDateString('en-CA');
                         if (payload.new.date === todayStr) {
-                            console.log("Realtime: Daily record updated for today. Syncing session.meta.");
-                            setSession(prev => ({ ...prev, meta: Number(payload.new.daily_goal) }));
+                            console.log("Realtime: Daily record updated for today. Syncing currentDailyGoal.");
+                            setCurrentDailyGoal(Number(payload.new.daily_goal));
                         }
                     }
                 }
@@ -207,9 +221,6 @@ export const FinanceProvider = ({ children }) => {
             supabase.removeChannel(channel);
         };
     }, []);
-
-    // GPS logic removed per user request. Relying on Odometer.
-
 
     // Actions (Write to Supabase)
 
@@ -262,7 +273,6 @@ export const FinanceProvider = ({ children }) => {
             totalPausedTime: 0,
             gpsMiles: 0
         });
-        // setGpsMiles(0); // Reset GPS hook - This line was removed as per previous instructions
     };
 
     // Alias: startShift now calls startNewShift (legacy support)
@@ -393,33 +403,82 @@ export const FinanceProvider = ({ children }) => {
         });
     };
 
-    // ... (Weekly Goal logic remains same)
+    // Weekly Goal (Local Storage)
+    const [weeklyGoal, setWeeklyGoal] = useState(() => {
+        return parseFloat(localStorage.getItem('uber_weekly_goal')) || 1000;
+    });
+
+    const updateWeeklyGoal = (amount) => {
+        setWeeklyGoal(amount);
+        localStorage.setItem('uber_weekly_goal', amount);
+    };
 
     // Memoize Actions to prevent re-creation
     const actions = React.useMemo(() => ({
-        // ... (other actions)
+        startShift,
+        pauseShift,
+        resumeShift,
+        endShift,
+        addTrip,
+        updateTrip,
+        deleteTrip,
+        updateStartTime,
+        updateStartOdometer,
+        updateEndTime,
+        updateConfig,
+        updateDailyRecord,
         updateDailyGoal
     }), [session, config.gasPrice, config.vehicleMpg, config.maintenanceCostPerMile, dailyRecords]);
+    console.log("DEBUG: Actions memoized");
 
-    // ... (Metrics calculation needs update to use currentDailyGoal?)
-    // Actually metrics calculation uses session.meta. We should update metrics to use currentDailyGoal too
+    // Memoize Metrics Calculation
     const metrics = React.useMemo(() => {
-        // ...
-        // Use currentDailyGoal instead of session.meta
+        console.log("DEBUG: Calculating metrics...");
+        const currentTrips = session.startTime
+            ? trips.filter(t => t.timestamp >= session.startTime)
+            : [];
+
+        const totalEarnings = currentTrips.reduce((sum, t) => sum + t.amount, 0);
+
+        const lastOdometer = currentTrips.length > 0
+            ? currentTrips[currentTrips.length - 1].odometer
+            : session.initialOdometer;
+
+        const milesDriven = Math.max(0, (lastOdometer || 0) - (session.initialOdometer || 0));
         const metaRestante = Math.max(0, (currentDailyGoal || 0) - totalEarnings);
 
-        // ...
+        const totalOperatingCost = (
+            (milesDriven / config.vehicleMpg * config.gasPrice) +
+            (milesDriven * config.maintenanceCostPerMile)
+        );
+
+        const totalNetProfit = totalEarnings - totalOperatingCost;
+
+        const getWeekRange = () => {
+            const now = new Date();
+            const day = now.getDay(); // 0 is Sunday
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+            const monday = new Date(now.setDate(diff));
+            monday.setHours(0, 0, 0, 0);
+            return monday.getTime();
+        };
+
+        const weekStart = getWeekRange();
+        const weeklyEarnings = trips
+            .filter(t => t.timestamp >= weekStart)
+            .reduce((sum, t) => sum + t.amount, 0);
+
         return {
             totalEarnings,
             milesDriven,
             metaRestante,
             lastOdometer,
             weeklyEarnings,
-            weeklyGoal, // We might need to check this too later
+            weeklyGoal,
             totalOperatingCost,
             totalNetProfit,
             currentSpeed: 0,
-            currentDailyGoal // Expose it here too if needed by metrics consumers
+            currentDailyGoal
         };
     }, [session.startTime, session.initialOdometer, currentDailyGoal, trips, config.vehicleMpg, config.gasPrice, config.maintenanceCostPerMile, weeklyGoal]);
 
@@ -434,25 +493,11 @@ export const FinanceProvider = ({ children }) => {
         trips: session.startTime ? trips.filter(t => t.timestamp >= session.startTime) : [],
         allTrips: trips,
         dailyRecords,
-        currentDailyGoal, // EXPOSED HERE
-        actions: {
-            startShift,
-            pauseShift,
-            resumeShift,
-            endShift,
-            addTrip,
-            updateTrip,
-            deleteTrip,
-            updateStartTime,
-            updateStartOdometer,
-            updateEndTime,
-            updateConfig,
-            updateDailyRecord,
-            updateDailyGoal
-        },
+        currentDailyGoal,
+        actions,
         metrics,
         updateWeeklyGoal
-    }), [language, config, session, trips, dailyRecords, metrics, weeklyGoal, currentDailyGoal]);
+    }), [language, config, session, trips, dailyRecords, metrics, weeklyGoal, currentDailyGoal, actions]);
 
     return (
         <FinanceContext.Provider value={value}>
