@@ -399,15 +399,11 @@ export default function MetricsComparison() {
     // Usamos el promedio histórico (tripsPerHour). Si es 0 (inicio del día), asumimos 2.
     const projectedTrips = (timeLeftHours * (tripsPerHour || 2));
 
-    // 2. Protección contra división por cero o decimales irreales
-    // Si queda muy poco tiempo (ej. 15 min), asumimos que al menos haremos 1 viaje más
-    // para calcular cuánto debe valer ese "último viaje" para cerrar la meta.
-    const effectiveTripsRemaining = Math.max(1, projectedTrips);
-
-    // 3. Cálculo del Mínimo por Viaje (Estrictamente Bruto)
-    // Ejemplo: Faltan $106, quedan 4 viajes = $26.50 por viaje.
-    const minTripValue = metrics.metaRestante > 0
-        ? (metrics.metaRestante / effectiveTripsRemaining)
+    // 2. Cálculo del Mínimo por Viaje usando promedio REAL
+    // Si proyectamos 0.6 viajes y faltan $60, necesitamos $100/viaje
+    // Esto refleja la realidad: menos viajes = mayor valor por viaje necesario
+    const minTripValue = metrics.metaRestante > 0 && projectedTrips > 0
+        ? (metrics.metaRestante / projectedTrips)
         : 0;
     // Si la meta es 0 o negativa (ya se cumplió), el mínimo es 0
 
