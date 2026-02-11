@@ -389,16 +389,41 @@ export default function MetricsComparison() {
     // If viewing today, we might want to sync the goal back if it changed? 
     // Actually, let's trust the logic: specific day record > session default
 
-    // Monto Minimo Calculation
-    // Logic from Stopwatch.jsx: Required Rate = Meta Restante / Time Left
+    // Advanced Minimum Trip Value Calculation
     const timeLeftMs = session.endTime ? (session.endTime - Date.now()) : 0;
     const timeLeftHours = Math.max(0, timeLeftMs / 3600000);
 
-    // If we have time left, calculate required rate. Otherwise 0.
-    const requiredHourlyGross = timeLeftHours > 0 ? (metrics.metaRestante / timeLeftHours) : 0;
+    // Calculate average miles and cost per trip
+    const avgMilesPerTrip = filteredData.tripCount > 0
+        ? filteredData.totalMiles / filteredData.tripCount
+        : 5; // Default assumption: 5 miles per trip
 
-    // Min Trip Value = Required Hourly / Trips Per Hour
-    const minTripValue = tripsPerHour > 0 ? requiredHourlyGross / tripsPerHour : 0;
+    const avgCostPerTrip = (
+        (avgMilesPerTrip / config.vehicleMpg * effectiveGasPrice) +
+        (avgMilesPerTrip * config.maintenanceCostPerMile)
+    );
+
+    // Estimate remaining trips based on historical rate
+    const estimatedTripsRemaining = timeLeftHours * tripsPerHour;
+
+    // Calculate minimum gross per trip (includes operating costs)
+    // CRITICAL: Use Math.max(1, estimatedTripsRemaining) to avoid division issues
+    const minGrossPerTrip = estimatedTripsRemaining > 0
+        ? (metrics.metaRestante + (avgCostPerTrip * estimatedTripsRemaining)) / Math.max(1, estimatedTripsRemaining)
+        : 0;
+
+    // Apply 10% safety buffer for variability
+    const safetyFactor = 1.10;
+    const minTripValue = minGrossPerTrip * safetyFactor;
+
+    // Confidence indicator based on data quality
+    const tripConfidence = filteredData.tripCount >= 3 ? 'Alta' :
+        filteredData.tripCount >= 1 ? 'Media' : 'Baja';
+
+    // Current average for comparison
+    const avgTripValue = filteredData.tripCount > 0
+        ? filteredData.totalEarnings / filteredData.tripCount
+        : 0;
 
     const goalProgress = Math.min((filteredData.totalEarnings / dailyGoal) * 100, 100);
     const onTrack = isViewingActiveSession ? (projectedTotal >= dailyGoal) : (filteredData.totalEarnings >= dailyGoal);
@@ -594,8 +619,31 @@ export default function MetricsComparison() {
                             <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>{tripsPerHour.toFixed(1)}</div>
                         </div>
                         <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Monto Min/Viaje</div>
-                            <div style={{ fontSize: '20px', fontWeight: '800', color: '#fff' }}>${minTripValue.toFixed(2)}</div>
+                            <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                Monto Min/Viaje
+                                <span style={{
+                                    fontSize: '7px',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    background: tripConfidence === 'Alta' ? 'rgba(0, 215, 117, 0.2)' : tripConfidence === 'Media' ? 'rgba(245, 158, 11, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                    color: tripConfidence === 'Alta' ? '#00D775' : tripConfidence === 'Media' ? '#F59E0B' : '#EF4444',
+                                    fontWeight: '700'
+                                }}>
+                                    {tripConfidence}
+                                </span>
+                            </div>
+                            <div style={{
+                                fontSize: '20px',
+                                fontWeight: '800',
+                                color: minTripValue > avgTripValue && avgTripValue > 0 ? '#F59E0B' : '#00D775'
+                            }}>
+                                ${minTripValue.toFixed(2)}
+                            </div>
+                            {filteredData.tripCount > 0 && (
+                                <div style={{ fontSize: '8px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+                                    Prom: ${avgTripValue.toFixed(2)}
+                                </div>
+                            )}
                         </div>
                         <div style={{ background: 'linear-gradient(145deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.05))', borderRadius: '14px', padding: '14px', textAlign: 'center', border: '1px solid rgba(102, 126, 234, 0.2)' }}>
                             <div style={{ fontSize: '9px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'rgba(255,255,255,0.5)', marginBottom: '4px' }}>Proyección</div>
