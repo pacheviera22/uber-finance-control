@@ -389,23 +389,27 @@ export default function MetricsComparison() {
     // If viewing today, we might want to sync the goal back if it changed? 
     // Actually, let's trust the logic: specific day record > session default
 
-    // Minimum Trip Value Calculation (GROSS basis)
-    // Goal is GROSS earnings, so we calculate minimum GROSS per trip
+    // ---------------------------------------------------------
+    // CÁLCULO DE META BRUTA (HARD TARGET)
+    // ---------------------------------------------------------
     const timeLeftMs = session.endTime ? (session.endTime - Date.now()) : 0;
     const timeLeftHours = Math.max(0, timeLeftMs / 3600000);
 
-    // Estimate remaining trips based on historical rate
-    const estimatedTripsRemaining = timeLeftHours * tripsPerHour;
+    // 1. Estimar cuántos viajes caben en el tiempo restante
+    // Usamos el promedio histórico (tripsPerHour). Si es 0 (inicio del día), asumimos 2.
+    const projectedTrips = (timeLeftHours * (tripsPerHour || 2));
 
-    // Calculate minimum GROSS per trip to reach GROSS goal
-    // CRITICAL: Use Math.max(1, estimatedTripsRemaining) to avoid division issues
-    const minGrossPerTrip = estimatedTripsRemaining > 0
-        ? metrics.metaRestante / Math.max(1, estimatedTripsRemaining)
+    // 2. Protección contra división por cero o decimales irreales
+    // Si queda muy poco tiempo (ej. 15 min), asumimos que al menos haremos 1 viaje más
+    // para calcular cuánto debe valer ese "último viaje" para cerrar la meta.
+    const effectiveTripsRemaining = Math.max(1, projectedTrips);
+
+    // 3. Cálculo del Mínimo por Viaje (Estrictamente Bruto)
+    // Ejemplo: Faltan $106, quedan 4 viajes = $26.50 por viaje.
+    const minTripValue = metrics.metaRestante > 0
+        ? (metrics.metaRestante / effectiveTripsRemaining)
         : 0;
-
-    // Apply 10% safety buffer for variability
-    const safetyFactor = 1.10;
-    const minTripValue = minGrossPerTrip * safetyFactor;
+    // Si la meta es 0 o negativa (ya se cumplió), el mínimo es 0
 
     // Confidence indicator based on data quality
     const tripConfidence = filteredData.tripCount >= 3 ? 'Alta' :
