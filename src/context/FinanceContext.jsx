@@ -120,6 +120,20 @@ export const FinanceProvider = ({ children }) => {
                         };
                     });
                     setDailyRecords(recordsMap);
+
+                    // OVERRIDE session.meta with today's daily_goal if exists
+                    // This makes daily_records the source of truth for the goal
+                    const todayStr = new Date().toLocaleDateString('en-CA');
+                    if (recordsMap[todayStr] && recordsMap[todayStr].dailyGoal > 0) {
+                        console.log(`Loaded daily goal from history for ${todayStr}: ${recordsMap[todayStr].dailyGoal}`);
+                        // We update the local session state to match history
+                        // We don't need to trigger a DB update here, just sync local state
+                        if (sessionData) {
+                            sessionData.meta = recordsMap[todayStr].dailyGoal;
+                            // Also update the state we are about to set
+                            setSession(prev => ({ ...prev, meta: recordsMap[todayStr].dailyGoal }));
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Critical Error loading initial data:", error);
@@ -196,6 +210,13 @@ export const FinanceProvider = ({ children }) => {
                                 notes: payload.new.notes
                             }
                         }));
+
+                        // If the update is for TODAY, sync session.meta
+                        const todayStr = new Date().toLocaleDateString('en-CA');
+                        if (payload.new.date === todayStr) {
+                            console.log("Realtime: Daily record updated for today. Syncing session.meta.");
+                            setSession(prev => ({ ...prev, meta: Number(payload.new.daily_goal) }));
+                        }
                     }
                 }
             )
